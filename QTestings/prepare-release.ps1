@@ -1,5 +1,6 @@
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
+& (Join-Path $root "tools\cleanup-release-duplicates.ps1")
 $artifacts = Join-Path $root "release\artifacts"
 New-Item -ItemType Directory -Path $artifacts -Force | Out-Null
 

@@ -1,44 +1,29 @@
-# GitHub distribution — AlexRabbit
+# Distribution layout (read this once)
 
-**Primary distribution:** [GitHub Releases](https://github.com/AlexRabbit/MarkDown-Ultimate/releases) assets, **repo root** source, and [GitHub Pages](https://alexrabbit.github.io/MarkDown-Ultimate/).
+## One project — one folder
 
-There is **no** second copy of the project under `release/MarkDown-Ultimate/`. Staging is **`release/artifacts/`** only (gitignored).
+**Edit and run only here:**
 
-## Build release assets (from repo root)
+`A:\VibeCode\MarkDown Ultimate\`
 
-```powershell
-.\QTestings\prepare-release.ps1
-```
+That is the git repo root (`Launch-MarkDownUltimate.bat`, `dist/`, `frontend/`, etc.).
 
-| Asset | Path |
-| --- | --- |
-| **Portable launcher (.exe)** | `release\artifacts\MarkDown-Ultimate-Portable.exe` |
-| **Portable folder + zip** | `release\artifacts\MarkDown-Ultimate-Portable\`, `MarkDown-Ultimate-Portable.zip` |
-| **Android APK** | `release\artifacts\MarkDown-Ultimate.apk` (when SDK/`dx` available; else `ANDROID_BUILD_BLOCKER.md`) |
-
-The `.exe` starts embedded or system Python + `tools/serve_dist.py` and opens the browser. The `.bat` launcher in the same folder is optional.
-
-## Create / upload GitHub Release
+We **do not** maintain a second full copy at `release\MarkDown-Ultimate\`. If you see that folder, delete it and run:
 
 ```powershell
-.\QTestings\create-github-release.ps1 -Tag v0.2.2
+.\tools\cleanup-release-duplicates.ps1
 ```
 
-Requires [GitHub CLI](https://cli.github.com/) (`gh auth login`). Without `gh`, attach files from `release\artifacts\` manually on the Releases page.
+## GitHub Releases assets only
 
-## Verify before upload
+Build outputs go to **`release\artifacts\`** (gitignored):
 
-```powershell
-.\QTestings\scan-release-secrets.ps1
-cargo audit
-.\Launch-MarkDownUltimate.bat
-.\QTestings\smoke-local-serve.ps1
-```
+- `MarkDown-Ultimate-Portable.exe` — native window (WebView2), not an external browser
+- `MarkDown-Ultimate-Portable.zip` — same app + embedded Python + `dist/`
+- `MarkDown-Ultimate.apk` — when Android SDK + `dx` are installed
 
-## Repo-local git author (optional)
+Upload those files to [GitHub Releases](https://github.com/AlexRabbit/MarkDown-Ultimate/releases).
 
-```powershell
-powershell -File tools\setup-git-author.ps1
-```
+## Not the same as the repo name on disk
 
-Sets **AlexRabbit** / `AlexRabbit@users.noreply.github.com` for this repo only.
+The folder is `MarkDown Ultimate` (space) on your PC. GitHub repo is `MarkDown-Ultimate` (hyphen). That is normal — do not clone a third copy under `A:\VibeCode\MarkDown-Ultimate` unless you intentionally want a separate clone.

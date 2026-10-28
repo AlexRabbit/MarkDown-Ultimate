@@ -2,15 +2,19 @@
 
 [package]
 name = "mdu-launcher"
-version = "0.2.2"
+version = "0.2.3"
 edition = "2021"
 authors = ["AlexRabbit"]
 license = "MIT"
-description = "Portable Windows launcher for MarkDown Ultimate (local serve + browser)"
+description = "Portable Windows app — local server + native webview (no browser, no console)"
 
 [[bin]]
 name = "MarkDown-Ultimate-Portable"
 path = "src/main.rs"
+
+[dependencies]
+tao = "0.30"
+wry = "0.46"
 
 [profile.release]
 opt-level = "z"

@@ -1,19 +1,23 @@
-//! Starts the bundled or system Python server and opens the local web app.
+//! Native Windows shell: embeddable Python serves dist/; wry webview shows the app (no external browser).
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 use std::env;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::thread;
 use std::time::Duration;
 
+use tao::event_loop::{ControlFlow, EventLoop};
+use tao::event::Event;
+use tao::event::WindowEvent;
+use tao::window::WindowBuilder;
+
 const DEFAULT_PORT: &str = "8765";
 const APP_PATH: &str = "/MarkDown-Ultimate/";
 
 fn main() {
     if let Err(e) = run() {
-        eprintln!("MarkDown Ultimate launcher error: {e}");
-        eprintln!("Press Enter to exit.");
-        let mut line = String::new();
-        let _ = std::io::stdin().read_line(&mut line);
+        show_fatal(&e);
         std::process::exit(1);
     }
 }
@@ -25,7 +29,7 @@ fn run() -> Result<(), String> {
     let index = root.join("dist").join("index.html");
     if !index.is_file() {
         return Err(format!(
-            "dist/index.html not found under {}. Run Trunk build first.",
+            "dist/index.html not found in {}. Re-run portable-bundle from repo root.",
             root.display()
         ));
     }
@@ -33,34 +37,79 @@ fn run() -> Result<(), String> {
     let port = env::var("MDU_PORT").unwrap_or_else(|_| DEFAULT_PORT.to_string());
     let url = format!("http://127.0.0.1:{port}{APP_PATH}");
 
+    start_server(&root, &port)?;
+
+    for attempt in 0..20 {
+        thread::sleep(Duration::from_millis(250));
+        if url_reachable(&url) {
+            break;
+        }
+        if attempt == 19 {
+            return Err(format!("Server did not respond at {url}"));
+        }
+    }
+
+    let event_loop = EventLoop::new();
+    let window = WindowBuilder::new()
+        .with_title("MarkDown Ultimate")
+        .with_inner_size(tao::dpi::LogicalSize::new(1280.0, 840.0))
+        .build(&event_loop)
+        .map_err(|e| format!("window: {e}"))?;
+
+    let _webview = wry::WebViewBuilder::new()
+        .with_url(&url)
+        .build(&window)
+        .map_err(|e| format!("webview: {e}"))?;
+
+    event_loop.run(move |event, _, control_flow| {
+        *control_flow = ControlFlow::Wait;
+        if let Event::WindowEvent {
+            event: WindowEvent::CloseRequested,
+            ..
+        } = event
+        {
+            *control_flow = ControlFlow::Exit;
+        }
+    });
+}
+
+fn url_reachable(url: &str) -> bool {
+    Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-Command",
+            &format!(
+                "try {{ (Invoke-WebRequest -Uri '{}' -UseBasicParsing -TimeoutSec 2).StatusCode -eq 200 }} catch {{ $false }}",
+                url
+            ),
+        ])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| s.trim() == "True")
+        .unwrap_or(false)
+}
+
+fn start_server(root: &Path, port: &str) -> Result<(), String> {
     let serve = root.join("tools").join("serve_dist.py");
     if !serve.is_file() {
         return Err(format!("Missing {}", serve.display()));
     }
-
-    let python = resolve_python(&root)?;
-    env::set_var("MDU_PORT", &port);
+    let python = resolve_python(root)?;
+    env::set_var("MDU_PORT", port);
     env::set_var("MDU_QUIET", "1");
 
     Command::new(&python.exe)
-        .args(python.args)
+        .args(&python.args)
         .arg(&serve)
-        .current_dir(&root)
+        .current_dir(root)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
         .map_err(|e| format!("start server ({:?}): {e}", python.exe))?;
-
-    thread::sleep(Duration::from_secs(3));
-
-    Command::new("cmd")
-        .args(["/C", "start", "", &url])
-        .spawn()
-        .map_err(|e| format!("open browser: {e}"))?;
-
-    println!("MarkDown Ultimate: {url}");
-    println!("Leave this window open while you use the app.");
     Ok(())
 }
 
@@ -103,7 +152,7 @@ fn resolve_python(root: &Path) -> Result<PythonCmd, String> {
     }
 
     Err(
-        "Python not found. Use the portable bundle (embeddable python/) or install Python 3."
+        "Python not found next to this app (python/ folder). Re-run tools/portable-bundle.ps1."
             .to_string(),
     )
 }
@@ -116,4 +165,13 @@ fn which_on_path(name: &str) -> bool {
         .status()
         .map(|s| s.success())
         .unwrap_or(false)
+}
+
+fn show_fatal(msg: &str) {
+    let _ = Command::new("cmd")
+        .args(["/C", "start", "", "mshta", &format!(
+            "javascript:alert('MarkDown Ultimate:\\n{}');close()",
+            msg.replace('\'', "\\'").replace('\n', "\\n")
+        )])
+        .spawn();
 }

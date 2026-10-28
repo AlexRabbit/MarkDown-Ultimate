@@ -11,8 +11,11 @@ if (-not (Test-Path (Join-Path $root "dist\index.html"))) {
     Pop-Location
 }
 
-if (Test-Path $out) { Remove-Item -Recurse -Force $out }
-New-Item -ItemType Directory -Path $out -Force | Out-Null
+if (Test-Path $out) {
+  try { Remove-Item -Recurse -Force $out -ErrorAction Stop }
+  catch { Write-Host "Note: could not remove $out (in use) — updating files in place." }
+}
+if (-not (Test-Path $out)) { New-Item -ItemType Directory -Path $out -Force | Out-Null }
 New-Item -ItemType Directory -Path $artifacts -Force | Out-Null
 
 Copy-Item -Recurse -Force (Join-Path $root "dist") (Join-Path $out "dist")

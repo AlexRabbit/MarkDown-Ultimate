@@ -12,6 +12,14 @@ function Write-Log($msg) {
 
 Write-Log "Android build attempt (Dioxus mobile scaffold)"
 
+if (-not $env:ANDROID_HOME) {
+    $guess = Join-Path $env:LOCALAPPDATA "Android\Sdk"
+    if (Test-Path $guess) {
+        $env:ANDROID_HOME = $guess
+        Write-Log "ANDROID_HOME set to $guess"
+    }
+}
+
 $dx = Get-Command dx -ErrorAction SilentlyContinue
 if (-not $dx) {
     Write-Log "BLOCKER: dioxus CLI (dx) not on PATH. Install: cargo install dioxus-cli"
