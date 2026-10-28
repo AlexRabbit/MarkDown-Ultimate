@@ -38,7 +38,7 @@
 
 ## What this app is
 
-MarkDown Ultimate is a **browser-based Markdown workspace**: multiple files and folders, live preview, export, and optional local API engine. Documents are stored in **browser local storage** unless you use the optional Actix engine.
+MarkDown Ultimate is a **browser-based Markdown workspace**: multiple files and folders, live preview, export, and optional local API engine. Documents are stored in **browser local storage** unless you use the optional Axum engine.
 
 Built with **Rust + Leptos (WASM)** for the UI and shared **markdown_core** for rendering (CommonMark/GFM-style features, KaTeX math, spoilers, etc.).
 
@@ -49,7 +49,7 @@ Built with **Rust + Leptos (WASM)** for the UI and shared **markdown_core** for 
 | Feature | How to use |
 | --- | --- |
 | **View modes** | Top pill: **Markdown** / **Both** / **Preview** — all modes stay editable. |
-| **Sidebar** | **+** creates folders; **⋮** on folders for rename/delete; drag files/folders to reorder or nest. |
+| **Sidebar** | **+** new folders (unique names); **▼/▶** expand/collapse; **⋮** on files and folders (rename/delete); drag to reorder/nest; scroll the file list and outline. |
 | **Tools panel** | **⟨ Tools** on the right — command registry (bold, H1–H6, tables, footnotes, callouts); drag the left edge to resize. |
 | **Outline** | Heading list under the file tree; click to jump in the editor. |
 | **Find / replace** | Tools → Find and replace, or **Ctrl+F**. |
@@ -120,7 +120,11 @@ trunk serve
 .\QTestings\prepare-release.ps1
 ```
 
-Output upload snapshot: `release\MarkDown-Ultimate\`
+Output upload snapshot: `release\MarkDown-Ultimate\` (gitignored staging folder — safe to zip for manual GitHub upload).
+
+**Portable Windows folder:** `powershell -File tools\portable-bundle.ps1` → `portable\MarkDown-Ultimate-Portable\` (embeddable Python + built `dist`). See `release\UPLOAD_NOTES.md` for GitHub Release assets.
+
+**Android app:** not shipped yet — see `apps/README.md`.
 
 ---
 
@@ -130,7 +134,7 @@ Output upload snapshot: `release\MarkDown-Ultimate\`
 | --- | --- |
 | `frontend/` | Leptos WASM UI, styles, tour, tools sidebar |
 | `modules/` | Workspace tree, markdown core, workflow import/export |
-| `engine/` | Optional Actix HTTP API |
+| `engine/` | Optional Axum HTTP API + static `dist/` |
 | `code/` | Shared config and diagnostics |
 | `system/` | Docker compose for local databases |
 | `tools/` | Local server + launcher helpers |

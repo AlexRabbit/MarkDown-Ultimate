@@ -25,6 +25,10 @@ if not exist "dist\index.html" (
 
 if "%MDU_PORT%"=="" set "MDU_PORT=8765"
 
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":%MDU_PORT% " ^| findstr LISTENING') do (
+  taskkill /F /PID %%a >nul 2>&1
+)
+
 where python >nul 2>&1
 if %errorlevel%==0 (
   set "PYEXE=python"
@@ -56,7 +60,7 @@ exit /b 1
 echo Starting local web server - do not open index.html as a file.
 set "MDU_PORT=%MDU_PORT%"
 start "" /B %PYEXE% %PYARG% "%~dp0tools\serve_dist.py"
-timeout /t 2 /nobreak >nul
+timeout /t 3 /nobreak >nul
 start "" "http://127.0.0.1:%MDU_PORT%/MarkDown-Ultimate/"
 echo.
 echo MarkDown Ultimate: http://127.0.0.1:%MDU_PORT%/MarkDown-Ultimate/

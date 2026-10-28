@@ -4,6 +4,7 @@ use mu_diagnostics::{emit, recent_events, Severity};
 use mu_markdown_core::render_markdown;
 use mu_workflow::{export_container, import_container, WorkflowMeta, WORKFLOW_MAGIC};
 use mu_workspace::{Node, Workspace};
+use std::collections::HashSet;
 use wasm_bindgen::closure::Closure;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
@@ -36,6 +37,35 @@ enum ViewMode {
 }
 
 const VIEW_MODE_KEY: &str = "mdu_view_mode_v1";
+const COLLAPSED_FOLDERS_KEY: &str = "mdu_collapsed_folders_v1";
+
+fn load_collapsed_folders() -> HashSet<String> {
+    LocalStorage::get::<Vec<String>>(COLLAPSED_FOLDERS_KEY)
+        .map(|v| v.into_iter().collect())
+        .unwrap_or_default()
+}
+
+fn persist_collapsed_folders(set: &HashSet<String>) {
+    let list: Vec<String> = set.iter().cloned().collect();
+    if LocalStorage::set(COLLAPSED_FOLDERS_KEY, &list).is_err() {
+        emit(
+            Severity::Warn,
+            "storage",
+            "persist_failed",
+            "frontend",
+            "could not save folder expand state",
+            None,
+            None,
+        );
+    }
+}
+
+fn pick_active_after_delete(ws: &Workspace, deleted_id: &str, current_active: &str) -> Option<String> {
+    if current_active != deleted_id {
+        return None;
+    }
+    ws.flatten_file_entries().first().map(|e| e.id.clone())
+}
 
 fn load_view_mode() -> ViewMode {
     LocalStorage::get::<String>(VIEW_MODE_KEY)
@@ -216,6 +246,7 @@ pub fn App() -> impl IntoView {
     let (show_pulse, set_show_pulse) = signal(!LocalStorage::get::<bool>(PULSE_KEY).unwrap_or(false));
     let (menu, set_menu) = signal((MenuTarget::None, 0i32, 0i32));
     let (drag_id, set_drag_id) = signal(String::new());
+    let (collapsed_folders, set_collapsed_folders) = signal(load_collapsed_folders());
     let (engine_online, set_engine_online) = signal(false);
     let (tools_open, set_tools_open) = signal(load_tools_open());
     let (tools_width, set_tools_width) = signal(load_tools_width());
@@ -396,6 +427,7 @@ pub fn App() -> impl IntoView {
                                 }
                             }>"+"</button>
                     </div>
+                    <div class="sidebar-tree-scroll">
                     <TreeView
                         nodes=Signal::derive(move || workspace.get().sorted_root_nodes())
                         active_id=active_id
@@ -408,7 +440,10 @@ pub fn App() -> impl IntoView {
                         set_drag_id=set_drag_id
                         set_menu=set_menu
                         parent_id=None
+                        collapsed_folders=collapsed_folders
+                        set_collapsed_folders=set_collapsed_folders
                     />
+                    </div>
                     <OutlinePanel content=content />
                 </aside>
                 <div class="center-column">
@@ -439,7 +474,17 @@ pub fn App() -> impl IntoView {
                 </section>
                 </div>
             </div>
-            {move || context_menu_view(menu.get(), set_menu, workspace, persist.clone())}
+            {move || context_menu_view(
+                menu.get(),
+                set_menu,
+                workspace,
+                persist.clone(),
+                active_id,
+                set_active_id,
+                content,
+                set_content,
+                save_content,
+            )}
             {move || modal_view(modal.get(), set_modal, workspace, active_id, view_mode, content, set_content, save_content, persist.clone(), set_active_id, set_view_mode)}
         </div>
     }
@@ -482,6 +527,8 @@ fn TreeView(
     set_drag_id: WriteSignal<String>,
     set_menu: WriteSignal<(MenuTarget, i32, i32)>,
     parent_id: Option<String>,
+    collapsed_folders: ReadSignal<HashSet<String>>,
+    set_collapsed_folders: WriteSignal<HashSet<String>>,
 ) -> impl IntoView {
     view! {
         <ul class="file-list">
@@ -502,6 +549,8 @@ fn TreeView(
                     set_drag_id=set_drag_id
                     set_menu=set_menu
                     parent_id=parent_id.clone()
+                    collapsed_folders=collapsed_folders
+                    set_collapsed_folders=set_collapsed_folders
                 />
             </For>
         </ul>
@@ -521,10 +570,13 @@ fn SidebarNodeView(
     set_drag_id: WriteSignal<String>,
     set_menu: WriteSignal<(MenuTarget, i32, i32)>,
     parent_id: Option<String>,
+    collapsed_folders: ReadSignal<HashSet<String>>,
+    set_collapsed_folders: WriteSignal<HashSet<String>>,
 ) -> AnyView {
     let id = node.id().to_string();
     let id_click = id.clone();
     let id_ctx = id.clone();
+    let id_ctx_menu = id.clone();
     let id_drag = id.clone();
     let id_drop = id.clone();
     let parent_for_drop = parent_id.clone();
@@ -532,10 +584,14 @@ fn SidebarNodeView(
     let id_data = id.clone();
     match node {
         Node::File { name, .. } => view! {
-            <li class=move || if active_id.get() == id_for_class { "row active" } else { "row" }
+            <li class=move || if active_id.get() == id_for_class { "row file-row active" } else { "row file-row" }
                 draggable="true"
                 data-id=id_data
-                on:click=move |_| {
+                on:click=move |ev| {
+                    let target = event_target::<web_sys::HtmlElement>(&ev);
+                    if target.class_list().contains("kebab") {
+                        return;
+                    }
                     save_content(content.get_untracked());
                     set_active_id.set(id_click.clone());
                 }
@@ -559,7 +615,14 @@ fn SidebarNodeView(
                         persist.run(ws);
                     }
                 }
-            >{name}</li>
+            >
+                <button type="button" class="kebab" aria-label="File menu"
+                    on:click=move |ev| {
+                        ev.stop_propagation();
+                        set_menu.set((MenuTarget::SidebarNode(id_ctx_menu.clone()), ev.client_x(), ev.client_y()));
+                    }>"⋮"</button>
+                <span class="file-name">{name}</span>
+            </li>
         }.into_any(),
         Node::Folder { name, id: fid, .. } => {
             let folder_id_drop = fid.clone();
@@ -567,6 +630,10 @@ fn SidebarNodeView(
             let folder_id_menu = fid.clone();
             let folder_id_drag = fid.clone();
             let folder_id_parent = fid.clone();
+            let folder_id_toggle = fid.clone();
+            let folder_id_toggle2 = fid.clone();
+            let folder_id_chevron = fid.clone();
+            let folder_id_collapsed_check = fid.clone();
             view! {
                 <li class="folder-block">
                     <div class="row folder"
@@ -586,6 +653,21 @@ fn SidebarNodeView(
                             }
                         }
                     >
+                        <button type="button" class="folder-toggle" aria-label="Expand or collapse folder"
+                            aria-expanded=move || !collapsed_folders.get().contains(&folder_id_toggle)
+                            on:click=move |ev| {
+                                ev.stop_propagation();
+                                set_collapsed_folders.update(|set| {
+                                    if set.contains(&folder_id_toggle2) {
+                                        set.remove(&folder_id_toggle2);
+                                    } else {
+                                        set.insert(folder_id_toggle2.clone());
+                                    }
+                                    persist_collapsed_folders(set);
+                                });
+                            }>
+                            {move || if collapsed_folders.get().contains(&folder_id_chevron) { "▶" } else { "▼" }}
+                        </button>
                         <button type="button" class="kebab" aria-label="Folder menu"
                             on:click=move |ev| {
                                 ev.stop_propagation();
@@ -593,6 +675,13 @@ fn SidebarNodeView(
                             }>"⋮"</button>
                         <span class="folder-name">"📁 " {name.clone()}</span>
                     </div>
+                    <div class=move || {
+                        if collapsed_folders.get().contains(&folder_id_collapsed_check) {
+                            "folder-children collapsed"
+                        } else {
+                            "folder-children"
+                        }
+                    }>
                     <TreeView
                         nodes=Signal::derive(move || {
                             workspace.get().sorted_children_of(&folder_id_tree).unwrap_or_default()
@@ -607,7 +696,10 @@ fn SidebarNodeView(
                         set_drag_id=set_drag_id
                         set_menu=set_menu
                         parent_id=Some(folder_id_parent.clone())
+                        collapsed_folders=collapsed_folders
+                        set_collapsed_folders=set_collapsed_folders
                     />
+                    </div>
                 </li>
             }.into_any()
         }
@@ -619,6 +711,11 @@ fn context_menu_view(
     set_menu: WriteSignal<(MenuTarget, i32, i32)>,
     workspace: ReadSignal<Workspace>,
     persist: Callback<Workspace>,
+    active_id: ReadSignal<String>,
+    set_active_id: WriteSignal<String>,
+    content: ReadSignal<String>,
+    set_content: WriteSignal<String>,
+    save_content: impl Fn(String) + Copy + Send + 'static,
 ) -> AnyView {
     let (target, x, y) = menu;
     if matches!(target, MenuTarget::None | MenuTarget::Editor) {
@@ -659,8 +756,16 @@ fn context_menu_view(
                                 }>"Rename"</button>
                                 <button type="button" on:click=move |_| {
                                     if window_confirm("Delete this item?") {
+                                        save_content(content.get_untracked());
                                         let mut ws = workspace.get_untracked();
-                                        if ws.delete(&nid_del).is_ok() { persist.run(ws); }
+                                        let current = active_id.get_untracked();
+                                        if ws.delete(&nid_del).is_ok() {
+                                            if let Some(next) = pick_active_after_delete(&ws, &nid_del, &current) {
+                                                set_active_id.set(next.clone());
+                                                set_content.set(find_content(&ws, &next).unwrap_or_default());
+                                            }
+                                            persist.run(ws);
+                                        }
                                     }
                                     close(());
                                 }>"Delete"</button>

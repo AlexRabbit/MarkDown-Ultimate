@@ -10,6 +10,7 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & "$PSScriptRoot\tour-coverage.ps1"
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & "$PSScriptRoot\smoke-pdf-export.ps1"
+& "$PSScriptRoot\smoke-local-serve.ps1"
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $honchoScript = Join-Path $PSScriptRoot "..\aimemos\verify-honcho.ps1"
 if (Test-Path $honchoScript) {
