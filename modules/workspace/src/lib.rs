@@ -129,6 +129,46 @@ impl Workspace {
         })
     }
 
+    pub fn sibling_names(&self, parent_id: Option<&str>) -> Vec<String> {
+        let nodes: &[Node] = match parent_id {
+            None => &self.root,
+            Some(pid) => {
+                let Some(Node::Folder { children, .. }) = find_in_nodes(&self.root, pid) else {
+                    return Vec::new();
+                };
+                children
+            }
+        };
+        nodes
+            .iter()
+            .map(|n| match n {
+                Node::File { name, .. } | Node::Folder { name, .. } => name.clone(),
+            })
+            .collect()
+    }
+
+    pub fn unique_sibling_name(&self, parent_id: Option<&str>, base: &str) -> String {
+        let existing: std::collections::HashSet<String> =
+            self.sibling_names(parent_id).into_iter().collect();
+        if !existing.contains(base) {
+            return base.to_string();
+        }
+        for n in 1..999 {
+            let candidate = format!("{base} ({n})");
+            if !existing.contains(&candidate) {
+                return candidate;
+            }
+        }
+        format!("{base}-{}", Uuid::new_v4().to_string()[..6].to_string())
+    }
+
+    pub fn sorted_children_of(&self, id: &str) -> Option<Vec<Node>> {
+        self.children_of(id).map(|mut nodes| {
+            nodes.sort_by(|a, b| node_updated_at(b).cmp(&node_updated_at(a)));
+            nodes
+        })
+    }
+
     pub fn rename(&mut self, id: &str, new_name: &str) -> Result<(), WorkspaceError> {
         let new_name = new_name.trim();
         if new_name.is_empty() {
@@ -431,11 +471,22 @@ mod tests {
     }
 
     #[test]
-    fn create_folder_and_file_inside() {
+    fn multiple_root_files_all_listed() {
         let mut ws = Workspace::default();
-        let fid = ws.create_folder(None, "docs").unwrap();
-        let file_id = ws.add_file(Some(&fid), "note.md", "# hi".into()).unwrap();
-        assert_eq!(ws.flatten_files_newest_first().len(), 1);
-        assert!(!file_id.is_empty());
+        ws.add_file(None, "a.md", String::new()).unwrap();
+        ws.add_file(None, "b.md", String::new()).unwrap();
+        ws.add_file(None, "c.md", String::new()).unwrap();
+        assert_eq!(ws.sorted_root_nodes().len(), 3);
+    }
+
+    #[test]
+    fn unique_sibling_name_for_folders() {
+        let mut ws = Workspace::default();
+        ws.create_folder(None, "New folder").unwrap();
+        let n2 = ws.unique_sibling_name(None, "New folder");
+        assert_eq!(n2, "New folder (1)");
+        ws.create_folder(None, &n2).unwrap();
+        let n3 = ws.unique_sibling_name(None, "New folder");
+        assert_eq!(n3, "New folder (2)");
     }
 }

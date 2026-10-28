@@ -13,6 +13,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Run tests
         run: cargo test -p mu_config -p mu_diagnostics -p mu_workflow -p mu_workspace -p mu_markdown_core -p mu_persistence
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+      - name: Security audit
+        run: cargo audit
       - name: Tour coverage
         shell: pwsh
         run: ./QTestings/tour-coverage.ps1

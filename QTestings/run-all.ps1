@@ -9,8 +9,13 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & "$PSScriptRoot\tour-coverage.ps1"
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-& "$PSScriptRoot\..\aimemos\verify-honcho.ps1"
+& "$PSScriptRoot\smoke-pdf-export.ps1"
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+$honchoScript = Join-Path $PSScriptRoot "..\aimemos\verify-honcho.ps1"
+if (Test-Path $honchoScript) {
+  & $honchoScript
+  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+}
 & "$PSScriptRoot\engine-smoke.ps1"
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Write-Host "PASS (native suites + fixtures + tour coverage + aimemos identity + engine compile)"

@@ -62,24 +62,50 @@ window.mduReadEditor = function (editorId) {
 };
 
 window.mduPrintMarkdown = function (title, html) {
-  var w = window.open("", "_blank", "noopener,noreferrer");
+  var w = window.open("", "_blank");
   if (!w) {
     alert("Allow pop-ups to print or save as PDF.");
-    return;
+    return false;
   }
   w.document.open();
   w.document.write(
     "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>" +
-      (title || "Document") +
+      (title || "Document").replace(/</g, "&lt;") +
       "</title><style>body{font-family:Segoe UI,system-ui,sans-serif;padding:2rem;max-width:800px;margin:0 auto;line-height:1.5} table{border-collapse:collapse;width:100%} th,td{border:1px solid #ccc;padding:.35rem .5rem}</style></head><body>" +
       html +
       "</body></html>"
   );
   w.document.close();
-  w.onload = function () {
-    w.focus();
-    w.print();
-  };
+  setTimeout(function () {
+    try {
+      w.focus();
+      w.print();
+    } catch (e) {
+      console.warn("print failed", e);
+    }
+  }, 300);
+  return true;
+};
+
+window.mduCopyText = function (text) {
+  if (!text) return false;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).catch(function () {});
+    return true;
+  }
+  try {
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.left = "-9999px";
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  } catch (e) {
+    return false;
+  }
 };
 
 window.mduInitToolsSidebarResize = function (handleId, storageKey) {

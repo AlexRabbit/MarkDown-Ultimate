@@ -31,6 +31,16 @@ if %errorlevel%==0 (
   set "PYARG="
   goto :start_server
 )
+if exist "%~dp0portable\MarkDown-Ultimate-Portable\python\python.exe" (
+  set "PYEXE=%~dp0portable\MarkDown-Ultimate-Portable\python\python.exe"
+  set "PYARG="
+  goto :start_server
+)
+if exist "%~dp0python\python.exe" (
+  set "PYEXE=%~dp0python\python.exe"
+  set "PYARG="
+  goto :start_server
+)
 where py >nul 2>&1
 if %errorlevel%==0 (
   set "PYEXE=py"

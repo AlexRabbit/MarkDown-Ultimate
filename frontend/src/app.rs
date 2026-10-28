@@ -11,7 +11,7 @@ use wasm_bindgen_futures::JsFuture;
 use web_sys::{Blob, BlobPropertyBag, FileReader, RequestMode, Url};
 
 use crate::command_registry::{command_by_id, shortcut_lines, CommandKind, EditorCommand};
-use crate::editor_commands::{find_replace, init_editor_shortcuts, jump_to_offset, print_markdown};
+use crate::editor_commands::{copy_text, find_replace, init_editor_shortcuts, jump_to_offset, print_markdown};
 use crate::tools_sidebar::{
     load_tools_open, load_tools_width, run_command_on_editor, ToolsSidebar,
 };
@@ -257,7 +257,18 @@ pub fn App() -> impl IntoView {
     let persist = {
         let set_workspace = set_workspace;
         Callback::new(move |ws: Workspace| {
-            let _ = LocalStorage::set(STORAGE_KEY, serde_json::to_string(&ws).unwrap_or_default());
+            match LocalStorage::set(STORAGE_KEY, serde_json::to_string(&ws).unwrap_or_default()) {
+                Ok(()) => {}
+                Err(e) => emit(
+                    Severity::Warn,
+                    "storage",
+                    "local_storage_full",
+                    "frontend",
+                    format!("Could not save workspace: {e}"),
+                    None,
+                    None,
+                ),
+            }
             set_workspace.set(ws);
         })
     };
@@ -375,8 +386,13 @@ pub fn App() -> impl IntoView {
                         <button id="btnNewFolder" type="button" class="icon-btn" title="New folder" data-tour-id="btnNewFolder"
                             on:click=move |_| {
                                 let mut ws = workspace.get_untracked();
-                                if ws.create_folder(None, "New folder").is_ok() {
-                                    persist.run(ws);
+                                let name = ws.unique_sibling_name(None, "New folder");
+                                match ws.create_folder(None, &name) {
+                                    Ok(_) => {
+                                        persist.run(ws);
+                                        emit(Severity::Info, "workspace", "folder_create", "frontend", &name, None, None);
+                                    }
+                                    Err(e) => emit(Severity::Warn, "workspace", "folder_create_failed", "frontend", e.to_string(), None, None),
                                 }
                             }>"+"</button>
                     </div>
@@ -384,6 +400,8 @@ pub fn App() -> impl IntoView {
                         nodes=Signal::derive(move || workspace.get().sorted_root_nodes())
                         active_id=active_id
                         set_active_id=set_active_id
+                        content=content
+                        save_content=save_content
                         workspace=workspace
                         persist=persist.clone()
                         drag_id=drag_id
@@ -456,6 +474,8 @@ fn TreeView(
     nodes: Signal<Vec<Node>>,
     active_id: ReadSignal<String>,
     set_active_id: WriteSignal<String>,
+    content: ReadSignal<String>,
+    save_content: impl Fn(String) + Copy + Send + 'static,
     workspace: ReadSignal<Workspace>,
     persist: Callback<Workspace>,
     drag_id: ReadSignal<String>,
@@ -465,94 +485,132 @@ fn TreeView(
 ) -> impl IntoView {
     view! {
         <ul class="file-list">
-            {move || nodes.get().into_iter().map(|node| {
-                let id = node.id().to_string();
-                let id_click = id.clone();
-                let id_ctx = id.clone();
-                let id_drag = id.clone();
-                let id_drop = id.clone();
-                let parent_for_drop = parent_id.clone();
-                let id_for_class = id.clone();
-                let id_data = id.clone();
-                match node {
-                    Node::File { name, .. } => view! {
-                        <li class=move || if active_id.get() == id_for_class { "row active" } else { "row" }
-                            draggable="true"
-                            data-id=id_data
-                            on:click=move |_| set_active_id.set(id_click.clone())
-                            on:contextmenu=move |ev| {
-                                ev.prevent_default();
-                                ev.stop_propagation();
-                                set_menu.set((MenuTarget::SidebarNode(id_ctx.clone()), ev.client_x(), ev.client_y()));
-                            }
-                            on:dragstart=move |ev| {
-                                set_drag_id.set(id_drag.clone());
-                                if let Some(dt) = ev.data_transfer() { let _ = dt.set_data("text/plain", &id_drag); }
-                            }
-                            on:dragover=move |ev| ev.prevent_default()
-                            on:drop=move |ev| {
-                                ev.prevent_default();
-                                let dragged = drag_id.get();
-                                if dragged.is_empty() { return; }
-                                let mut ws = workspace.get_untracked();
-                                let before = Some(id_drop.as_str());
-                                if ws.move_node(&dragged, parent_for_drop.as_deref(), before).is_ok() {
-                                    persist.run(ws);
-                                }
-                            }
-                        >{name}</li>
-                    }.into_any(),
-                    Node::Folder { name, id: fid, .. } => {
-                        let folder_id_drop = fid.clone();
-                        let folder_id_tree = fid.clone();
-                        let folder_id_menu = fid.clone();
-                        let folder_id_drag = fid.clone();
-                        let folder_id_parent = fid.clone();
-                        view! {
-                            <li class="folder-block">
-                                <div class="row folder"
-                                    draggable="true"
-                                    on:dragstart=move |ev| {
-                                        set_drag_id.set(folder_id_drag.clone());
-                                        if let Some(dt) = ev.data_transfer() { let _ = dt.set_data("text/plain", &folder_id_drag); }
-                                    }
-                                    on:dragover=move |ev| ev.prevent_default()
-                                    on:drop=move |ev| {
-                                        ev.prevent_default();
-                                        let dragged = drag_id.get();
-                                        if dragged.is_empty() { return; }
-                                        let mut ws = workspace.get_untracked();
-                                        if ws.move_node(&dragged, Some(&folder_id_drop), None).is_ok() {
-                                            persist.run(ws);
-                                        }
-                                    }
-                                >
-                                    <button type="button" class="kebab" aria-label="Folder menu"
-                                        on:click=move |ev| {
-                                            ev.stop_propagation();
-                                            set_menu.set((MenuTarget::SidebarNode(folder_id_menu.clone()), ev.client_x(), ev.client_y()));
-                                        }>"⋮"</button>
-                                    <span class="folder-name">"📁 " {name.clone()}</span>
-                                </div>
-                                <TreeView
-                                    nodes=Signal::derive(move || {
-                                        workspace.get().children_of(&folder_id_tree).unwrap_or_default()
-                                    })
-                                    active_id=active_id
-                                    set_active_id=set_active_id
-                                    workspace=workspace
-                                    persist=persist.clone()
-                                    drag_id=drag_id
-                                    set_drag_id=set_drag_id
-                                    set_menu=set_menu
-                                    parent_id=Some(folder_id_parent.clone())
-                                />
-                            </li>
-                        }.into_any()
+            <For
+                each=move || nodes.get()
+                key=|node| node.id().to_string()
+                let:node
+            >
+                <SidebarNodeView
+                    node=node.clone()
+                    active_id=active_id
+                    set_active_id=set_active_id
+                    content=content
+                    save_content=save_content
+                    workspace=workspace
+                    persist=persist.clone()
+                    drag_id=drag_id
+                    set_drag_id=set_drag_id
+                    set_menu=set_menu
+                    parent_id=parent_id.clone()
+                />
+            </For>
+        </ul>
+    }
+}
+
+#[component]
+fn SidebarNodeView(
+    node: Node,
+    active_id: ReadSignal<String>,
+    set_active_id: WriteSignal<String>,
+    content: ReadSignal<String>,
+    save_content: impl Fn(String) + Copy + Send + 'static,
+    workspace: ReadSignal<Workspace>,
+    persist: Callback<Workspace>,
+    drag_id: ReadSignal<String>,
+    set_drag_id: WriteSignal<String>,
+    set_menu: WriteSignal<(MenuTarget, i32, i32)>,
+    parent_id: Option<String>,
+) -> AnyView {
+    let id = node.id().to_string();
+    let id_click = id.clone();
+    let id_ctx = id.clone();
+    let id_drag = id.clone();
+    let id_drop = id.clone();
+    let parent_for_drop = parent_id.clone();
+    let id_for_class = id.clone();
+    let id_data = id.clone();
+    match node {
+        Node::File { name, .. } => view! {
+            <li class=move || if active_id.get() == id_for_class { "row active" } else { "row" }
+                draggable="true"
+                data-id=id_data
+                on:click=move |_| {
+                    save_content(content.get_untracked());
+                    set_active_id.set(id_click.clone());
+                }
+                on:contextmenu=move |ev| {
+                    ev.prevent_default();
+                    ev.stop_propagation();
+                    set_menu.set((MenuTarget::SidebarNode(id_ctx.clone()), ev.client_x(), ev.client_y()));
+                }
+                on:dragstart=move |ev| {
+                    set_drag_id.set(id_drag.clone());
+                    if let Some(dt) = ev.data_transfer() { let _ = dt.set_data("text/plain", &id_drag); }
+                }
+                on:dragover=move |ev| ev.prevent_default()
+                on:drop=move |ev| {
+                    ev.prevent_default();
+                    let dragged = drag_id.get();
+                    if dragged.is_empty() { return; }
+                    let mut ws = workspace.get_untracked();
+                    let before = Some(id_drop.as_str());
+                    if ws.move_node(&dragged, parent_for_drop.as_deref(), before).is_ok() {
+                        persist.run(ws);
                     }
                 }
-            }).collect_view()}
-        </ul>
+            >{name}</li>
+        }.into_any(),
+        Node::Folder { name, id: fid, .. } => {
+            let folder_id_drop = fid.clone();
+            let folder_id_tree = fid.clone();
+            let folder_id_menu = fid.clone();
+            let folder_id_drag = fid.clone();
+            let folder_id_parent = fid.clone();
+            view! {
+                <li class="folder-block">
+                    <div class="row folder"
+                        draggable="true"
+                        on:dragstart=move |ev| {
+                            set_drag_id.set(folder_id_drag.clone());
+                            if let Some(dt) = ev.data_transfer() { let _ = dt.set_data("text/plain", &folder_id_drag); }
+                        }
+                        on:dragover=move |ev| ev.prevent_default()
+                        on:drop=move |ev| {
+                            ev.prevent_default();
+                            let dragged = drag_id.get();
+                            if dragged.is_empty() { return; }
+                            let mut ws = workspace.get_untracked();
+                            if ws.move_node(&dragged, Some(&folder_id_drop), None).is_ok() {
+                                persist.run(ws);
+                            }
+                        }
+                    >
+                        <button type="button" class="kebab" aria-label="Folder menu"
+                            on:click=move |ev| {
+                                ev.stop_propagation();
+                                set_menu.set((MenuTarget::SidebarNode(folder_id_menu.clone()), ev.client_x(), ev.client_y()));
+                            }>"⋮"</button>
+                        <span class="folder-name">"📁 " {name.clone()}</span>
+                    </div>
+                    <TreeView
+                        nodes=Signal::derive(move || {
+                            workspace.get().sorted_children_of(&folder_id_tree).unwrap_or_default()
+                        })
+                        active_id=active_id
+                        set_active_id=set_active_id
+                        content=content
+                        save_content=save_content
+                        workspace=workspace
+                        persist=persist.clone()
+                        drag_id=drag_id
+                        set_drag_id=set_drag_id
+                        set_menu=set_menu
+                        parent_id=Some(folder_id_parent.clone())
+                    />
+                </li>
+            }.into_any()
+        }
     }
 }
 
@@ -579,8 +637,11 @@ fn context_menu_view(
                     <button type="button" on:click=move |_| {
                         let mut ws = workspace.get_untracked();
                         let parent = parent_for_folder.as_deref();
-                        let _ = ws.create_folder(parent, "New folder");
-                        persist.run(ws);
+                        let name = ws.unique_sibling_name(parent, "New folder");
+                        match ws.create_folder(parent, &name) {
+                            Ok(_) => persist.run(ws),
+                            Err(e) => emit(Severity::Warn, "workspace", "folder_create_failed", "frontend", e.to_string(), None, None),
+                        }
                         close(());
                     }>"New folder"</button>
                     {match node_id.clone() {
@@ -623,7 +684,7 @@ fn modal_view(
     view_mode: ReadSignal<ViewMode>,
     content: ReadSignal<String>,
     set_content: WriteSignal<String>,
-    save_content: impl Fn(String) + Copy + 'static,
+    save_content: impl Fn(String) + Copy + Send + 'static,
     persist: Callback<Workspace>,
     set_active_id: WriteSignal<String>,
     set_view_mode: WriteSignal<ViewMode>,
@@ -646,8 +707,11 @@ fn modal_view(
                         let title = export_filename(&ws, &active_id.get_untracked());
                         let html = render_markdown(&content.get_untracked());
                         set_modal.set(ModalKind::None);
-                        print_markdown(&title, &html);
-                        emit(Severity::Info, "export", "pdf", "frontend", "print document", None, None);
+                        if !print_markdown(&title, &html) {
+                            emit(Severity::Warn, "export", "pdf_blocked", "frontend", "Allow pop-ups to print or save as PDF", None, None);
+                        } else {
+                            emit(Severity::Info, "export", "pdf", "frontend", "print document", None, None);
+                        }
                     }>"PDF (print dialog)"</button>
                     <button type="button" on:click=move |_| {
                         let ws = workspace.get_untracked();
@@ -696,14 +760,22 @@ fn modal_view(
         }.into_any(),
         ModalKind::Diagnostics => {
             let lines = recent_events(80);
+            let log_text = lines.join("\n");
             view! {
                 <div class="modal-backdrop" role="dialog" aria-modal="true" on:click=move |_| set_modal.set(ModalKind::None)>
                     <div class="modal modal-wide" on:click=|ev| ev.stop_propagation()>
                         <h2>"Diagnostics"</h2>
-                        <pre class="diag-log">{lines.join("\n")}</pre>
-                        <button type="button" on:click=move |_| {
-                            trigger_download("events-export.jsonl", &lines.join("\n"), "application/x-ndjson");
+                        <pre class="diag-log" id="diagLogPre">{log_text.clone()}</pre>
+                        <div class="modal-actions">
+                        <button type="button" on:click={
+                            let log_copy = log_text.clone();
+                            move |_| copy_text_to_clipboard(&log_copy)
+                        }>"Copy all"</button>
+                        <button type="button" on:click={
+                            let log_export = log_text.clone();
+                            move |_| trigger_download("events-export.jsonl", &log_export, "application/x-ndjson")
                         }>"Export log"</button>
+                        </div>
                     </div>
                 </div>
             }.into_any()
@@ -735,7 +807,7 @@ fn modal_view(
 fn FindReplaceModal(
     set_modal: WriteSignal<ModalKind>,
     set_content: WriteSignal<String>,
-    save_content: impl Fn(String) + Copy + 'static,
+    save_content: impl Fn(String) + Copy + Send + 'static,
 ) -> impl IntoView {
     let (find, set_find) = signal(String::new());
     let (replace, set_replace) = signal(String::new());
@@ -949,24 +1021,56 @@ fn window_confirm(msg: &str) -> bool {
         .unwrap_or(false)
 }
 
+fn copy_text_to_clipboard(text: &str) {
+    if !copy_text(text) {
+        emit(
+            Severity::Warn,
+            "clipboard",
+            "copy_failed",
+            "frontend",
+            "Could not copy to clipboard",
+            None,
+            None,
+        );
+    }
+}
+
 async fn fetch_health() -> bool {
     let window = match web_sys::window() {
         Some(w) => w,
         None => return false,
     };
-    let mut opts = web_sys::RequestInit::new();
+    let opts = web_sys::RequestInit::new();
     opts.set_method("GET");
     opts.set_mode(RequestMode::Cors);
     let request = match web_sys::Request::new_with_str_and_init("/health", &opts) {
         Ok(r) => r,
         Err(_) => return false,
     };
-    match wasm_bindgen_futures::JsFuture::from(window.fetch_with_request(&request)).await {
-        Ok(resp) => {
-            resp.dyn_into::<web_sys::Response>()
-                .map(|r| r.ok())
-                .unwrap_or(false)
-        }
+    let resp = match wasm_bindgen_futures::JsFuture::from(window.fetch_with_request(&request)).await {
+        Ok(v) => match v.dyn_into::<web_sys::Response>() {
+            Ok(r) if r.ok() => r,
+            _ => return false,
+        },
+        Err(_) => return false,
+    };
+    let ct = resp
+        .headers()
+        .get("content-type")
+        .ok()
+        .flatten()
+        .unwrap_or_default();
+    if !ct.contains("json") {
+        return false;
+    }
+    match wasm_bindgen_futures::JsFuture::from(resp.json().unwrap()).await {
+        Ok(v) => v
+            .dyn_into::<js_sys::Object>()
+            .ok()
+            .and_then(|o| js_sys::Reflect::get(&o, &JsValue::from_str("status")).ok())
+            .and_then(|s| s.as_string())
+            .as_deref()
+            == Some("ok"),
         Err(_) => false,
     }
 }

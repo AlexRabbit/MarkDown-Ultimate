@@ -16,7 +16,9 @@ extern "C" {
     #[wasm_bindgen(js_namespace = window, js_name = mduReadEditor)]
     fn mdu_read_editor(editor_id: &str) -> JsValue;
     #[wasm_bindgen(js_namespace = window, js_name = mduPrintMarkdown)]
-    fn mdu_print_markdown(title: &str, html: &str);
+    fn mdu_print_markdown(title: &str, html: &str) -> bool;
+    #[wasm_bindgen(js_namespace = window, js_name = mduCopyText)]
+    fn mdu_copy_text(text: &str) -> bool;
     #[wasm_bindgen(js_namespace = window, js_name = mduJsEditorAction)]
     fn mdu_js_editor_action(editor_id: &str, action: &str) -> JsValue;
     #[wasm_bindgen(js_namespace = window, js_name = mduJumpToOffset)]
@@ -85,8 +87,12 @@ pub fn apply_tool(
     }
 }
 
-pub fn print_markdown(title: &str, html: &str) {
-    mdu_print_markdown(title, html);
+pub fn print_markdown(title: &str, html: &str) -> bool {
+    mdu_print_markdown(title, html)
+}
+
+pub fn copy_text(text: &str) -> bool {
+    mdu_copy_text(text)
 }
 
 fn js_value_to_string(v: JsValue) -> Option<String> {
