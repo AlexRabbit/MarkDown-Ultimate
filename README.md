@@ -120,11 +120,11 @@ trunk serve
 .\QTestings\prepare-release.ps1
 ```
 
-Output upload snapshot: `release\MarkDown-Ultimate\` (gitignored staging folder — safe to zip for manual GitHub upload).
+**Distribution:** develop in **repo root**; ship downloads via **[GitHub Releases](https://github.com/AlexRabbit/MarkDown-Ultimate/releases)** and **[GitHub Pages](https://alexrabbit.github.io/MarkDown-Ultimate/)**. Build outputs go to gitignored `release\artifacts\` only (not a nested full project copy).
 
-**Portable Windows folder:** `powershell -File tools\portable-bundle.ps1` → `portable\MarkDown-Ultimate-Portable\` (embeddable Python + built `dist`). See `release\UPLOAD_NOTES.md` for GitHub Release assets.
+**Portable Windows:** `powershell -File tools\portable-bundle.ps1` or `prepare-release.ps1` → `release\artifacts\MarkDown-Ultimate-Portable.exe` (+ zip). Details: `release\UPLOAD_NOTES.md`.
 
-**Android app:** not shipped yet — see `apps/README.md`.
+**Android:** `apps/` Dioxus scaffold — APK when SDK/`dx` are configured (`QTestings\build-android.ps1`).
 
 ---
 

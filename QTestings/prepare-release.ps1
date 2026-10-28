@@ -1,50 +1,35 @@
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
-$dest = Join-Path $root "release\MarkDown-Ultimate"
-if (Test-Path $dest) {
-    Remove-Item -Recurse -Force $dest
-}
-New-Item -ItemType Directory -Path $dest -Force | Out-Null
+$artifacts = Join-Path $root "release\artifacts"
+New-Item -ItemType Directory -Path $artifacts -Force | Out-Null
 
-# Ensure fresh static build for upload snapshot
+Write-Host "=== MarkDown Ultimate release artifacts (repo root build) ==="
+Write-Host "Output: $artifacts"
+Write-Host "Note: GitHub Releases host downloadable assets; this folder is gitignored staging only."
+Write-Host ""
+
 if (-not (Test-Path (Join-Path $root "dist\index.html"))) {
+    Write-Host "Building frontend (trunk --release)..."
     Push-Location (Join-Path $root "frontend")
     trunk build --release
     Pop-Location
 }
 
-$items = @(
-    "dist", "frontend", "modules", "engine", "databases", "system", "code",
-    "QTestings", "logs", "tools", "apps",
-    ".env.example", "Launch-MarkDownUltimate.bat", "README.md", "LICENSE",
-    "Cargo.toml", ".github"
-)
-foreach ($i in $items) {
-    $src = Join-Path $root $i
-    if (Test-Path $src) {
-        Copy-Item -Recurse -Force $src (Join-Path $dest $i)
-    }
+Write-Host "Building portable Windows bundle + MarkDown-Ultimate-Portable.exe..."
+& (Join-Path $root "tools\portable-bundle.ps1")
+
+Write-Host "Attempting Android APK (optional)..."
+$androidScript = Join-Path $PSScriptRoot "build-android.ps1"
+if (Test-Path $androidScript) {
+    & $androidScript
 }
 
-# Strip build artifacts
-Get-ChildItem -Path $dest -Recurse -Directory -Filter target -ErrorAction SilentlyContinue |
-    Remove-Item -Recurse -Force
-Get-ChildItem -Path $dest -Recurse -Directory -Filter ".trunk-target" -ErrorAction SilentlyContinue |
-    Remove-Item -Recurse -Force
-Remove-Item -Force (Join-Path $dest "dist\.trunk-lock") -ErrorAction SilentlyContinue
+Write-Host "Secret scan on artifacts..."
+& (Join-Path $PSScriptRoot "scan-release-secrets.ps1") -Root $artifacts
 
-# Runtime / private logs
-Get-ChildItem -Path (Join-Path $dest "logs\hot") -Filter "*.jsonl" -ErrorAction SilentlyContinue | Remove-Item -Force
-$diagHot = Join-Path $dest "code\diagnostics\logs"
-if (Test-Path $diagHot) { Remove-Item -Recurse -Force $diagHot }
-
-# Dev-only scripts inside upload tree
-@(
-    (Join-Path $dest "QTestings\prepare-release.ps1")
-) | ForEach-Object { if (Test-Path $_) { Remove-Item -Force $_ } }
-
-Copy-Item -Force (Join-Path $root "release\SECURITY_CHECK.md") (Join-Path $dest "SECURITY_CHECK.md")
-Copy-Item -Force (Join-Path $root "release\UPLOAD_NOTES.md") (Join-Path $dest "UPLOAD_NOTES.md")
-
-Write-Host "Public upload folder ready: $dest"
-Write-Host "Next: .\QTestings\scan-release-secrets.ps1"
+Write-Host ""
+Write-Host "Done. Upload assets from:"
+Get-ChildItem -Path $artifacts -File | ForEach-Object { Write-Host "  $($_.FullName)" }
+Write-Host ""
+Write-Host "GitHub Releases: https://github.com/AlexRabbit/MarkDown-Ultimate/releases"
+Write-Host "Optional: .\QTestings\create-github-release.ps1 -Tag v0.2.2"

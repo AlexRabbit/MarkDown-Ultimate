@@ -1,9 +1,9 @@
 param(
-    [string]$Root = (Join-Path (Split-Path $PSScriptRoot -Parent) "release\MarkDown-Ultimate")
+    [string]$Root = (Join-Path (Split-Path $PSScriptRoot -Parent) "release\artifacts")
 )
 $ErrorActionPreference = "Stop"
 if (-not (Test-Path $Root)) {
-    throw "Release folder missing. Run prepare-release.ps1 first: $Root"
+    throw "Artifacts folder missing. Run prepare-release.ps1 first: $Root"
 }
 
 $patterns = @(
@@ -18,7 +18,7 @@ $patterns = @(
 
 $hits = @()
 Get-ChildItem -Path $Root -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object {
-    if ($_.Extension -match '\.(wasm|pdb|exe|zip)$') { return }
+    if ($_.Extension -match '\.(wasm|pdb|exe|zip|apk|pyd|dll)$') { return }
     if ($_.FullName -match '\\code\\diagnostics\\src\\redact\.rs$') { return }
     $text = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue
     if (-not $text) { return }

@@ -11,4 +11,9 @@
 .cursor/
 aimemos/
 *.pdb
-release/
+release/*
+!release/UPLOAD_NOTES.md
+!release/RELEASE_NOTES.md
+!release/SECURITY_CHECK.md
+tools/mdu-launcher/target/
+portable/
