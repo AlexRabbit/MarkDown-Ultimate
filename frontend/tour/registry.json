@@ -1,0 +1,52 @@
+[
+  {
+    "element": "#btnCreate",
+    "title": "Create",
+    "description": "Adds a new Markdown file to the sidebar without closing your current document."
+  },
+  {
+    "element": "#btnOpen",
+    "title": "Open",
+    "description": "Import a .md file or a WorkFlow container (.mdu.json)."
+  },
+  {
+    "element": "#btnSave",
+    "title": "Save",
+    "description": "Export as Markdown, PDF via print, or a full WorkFlow backup."
+  },
+  {
+    "element": "#btnHowTo",
+    "title": "How to Use",
+    "description": "Starts this guided tour. The app never runs it automatically."
+  },
+  {
+    "element": "#btnDiagnostics",
+    "title": "Diagnostics",
+    "description": "Inspect recent structured events from the in-app flight recorder."
+  },
+  {
+    "element": "#sidebarTree",
+    "title": "Workspace",
+    "description": "Files and folders, newest first. Right-click for folder actions; drag to reorder or nest."
+  },
+  {
+    "element": "#modePreview",
+    "title": "Preview",
+    "description": "Split view: edit source on the left, rendered output on the right."
+  },
+  {
+    "element": "#modeSource",
+    "title": "Markdown",
+    "description": "Full-width source editor."
+  },
+  {
+    "element": "#editorArea",
+    "title": "Editor",
+    "description": "Right-click here for formatting shortcuts. Both modes stay editable."
+  },
+  {
+    "element": "#formatBar",
+    "title": "Quick formats",
+    "description": "One-click inserts for common Markdown constructs."
+  }
+]

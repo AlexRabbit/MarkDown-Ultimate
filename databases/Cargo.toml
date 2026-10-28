@@ -1,0 +1,12 @@
+[package]
+name = "mu_persistence"
+description = "Workspace blob persistence (file store; Aerospike via Docker in local stack)"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+mu_workspace = { path = "../modules/workspace" }

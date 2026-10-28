@@ -1,0 +1,13 @@
+services:
+  aerospike:
+    image: aerospike/aerospike-server:7.1.0.0
+    ports:
+      - "3000:3000"
+    environment:
+      NAMESPACE: mdu
+  nats:
+    image: nats:2.10
+    command: ["-js"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"

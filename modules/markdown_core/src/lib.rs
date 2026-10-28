@@ -2,6 +2,11 @@
 
 use ammonia::Builder;
 use comrak::{markdown_to_html, ComrakOptions};
+use regex::Regex;
+use std::sync::LazyLock;
+
+static SPOILER: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\|\|([^|\n]+?)\|\|").expect("spoiler regex"));
 
 pub fn render_markdown(source: &str) -> String {
     let pre = preprocess_telegram_extensions(source);
@@ -22,35 +27,68 @@ pub fn render_markdown(source: &str) -> String {
 
 fn preprocess_telegram_extensions(src: &str) -> String {
     let mut s = src.to_string();
-    // Telegram markdown aliases → CommonMark / HTML passthrough
-    s = s.replace("==", "<mark>").replace("==", "</mark>"); // naive; prefer HTML mode for ==
-    s = s.replace("||", "<tg-spoiler>").replace("||", "</tg-spoiler>");
-    // Preserve raw HTML blocks for Telegram tags comrak would strip
-    s = s
-        .replace("<tg-spoiler>", "<span class=\"tg-spoiler\">")
-        .replace("</tg-spoiler>", "</span>");
-    s = s.replace("<tg-collage>", "<div class=\"tg-collage\">");
-    s = s.replace("</tg-collage>", "</div>");
-    s = s.replace("<tg-slideshow>", "<div class=\"tg-slideshow\">");
-    s = s.replace("</tg-slideshow>", "</div>");
-    s = s.replace("<tg-button-row", "<div class=\"tg-button-row\"");
-    s = s.replace("</tg-button-row>", "</div>");
-    s = s.replace("<tg-button ", "<button class=\"tg-button\" ");
-    s = s.replace("<tg-map ", "<div class=\"tg-map\" ");
+    s = SPOILER
+        .replace_all(&s, r#"<span class="tg-spoiler">$1</span>"#)
+        .into_owned();
+    s = replace_telegram_mark(&s);
+    s = s.replace("<tg-spoiler>", "<span class=\"tg-spoiler\">");
+    s = s.replace("</tg-spoiler>", "</span>");
     s
+}
+
+fn replace_telegram_mark(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let bytes = input.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if i + 1 < bytes.len() && bytes[i] == b'=' && bytes[i + 1] == b'=' {
+            let triple = i > 0 && bytes[i - 1] == b'='
+                || i + 2 < bytes.len() && bytes[i + 2] == b'=';
+            if !triple {
+                if let Some(end) = input[i + 2..].find("==") {
+                    let inner = &input[i + 2..i + 2 + end];
+                    if !inner.contains('=') {
+                        out.push_str("<mark>");
+                        out.push_str(inner);
+                        out.push_str("</mark>");
+                        i += 2 + end + 2;
+                        continue;
+                    }
+                }
+            }
+        }
+        if let Some(ch) = input[i..].chars().next() {
+            out.push(ch);
+            i += ch.len_utf8();
+        } else {
+            break;
+        }
+    }
+    out
 }
 
 fn sanitize_html(html: &str) -> String {
     let mut builder = Builder::default();
-    builder.add_tag_attributes("div", &["class"]);
-    builder.add_tag_attributes("span", &["class"]);
-    builder.add_tag_attributes("button", &["class", "type", "data-type", "data-url"]);
-    builder.add_tag_attributes("table", &["class"]);
-    builder.add_tag_attributes("th", &["align"]);
-    builder.add_tag_attributes("td", &["align", "colspan", "rowspan"]);
-    builder.add_tag_attributes("details", &["open"]);
-    builder.add_tag_attributes("summary", &["class"]);
-    builder.add_tag_attributes("input", &["type", "checked", "disabled"]);
+    let class = &["class"];
+    let attrs = &[
+        "class", "open", "type", "checked", "disabled", "align", "colspan", "rowspan", "valign",
+        "id", "href", "target", "rel", "data-type", "data-url", "emoji-id", "unix", "format",
+        "lat", "long", "zoom", "style", "data-type", "data-url",
+    ];
+    for tag in [
+        "div", "span", "button", "table", "th", "td", "tr", "details", "summary", "figure",
+        "figcaption", "mark", "ins", "sub", "sup", "u", "tg-spoiler", "tg-collage", "tg-slideshow",
+        "tg-button-row", "tg-button", "tg-map", "tg-emoji", "tg-time", "tg-math", "aside", "cite",
+        "pre", "code", "a", "img", "video", "audio", "input", "hr", "footer", "blockquote",
+    ] {
+        builder.add_tag_attributes(tag, class);
+    }
+    builder.add_tag_attributes("a", &["href", "name", "class"]);
+    builder.add_tag_attributes("img", &["src", "alt", "class"]);
+    builder.add_tag_attributes("video", &["src", "class"]);
+    builder.add_tag_attributes("audio", &["src", "class"]);
+    builder.add_tag_attributes("td", attrs);
+    builder.add_tag_attributes("th", attrs);
     builder.clean(html).to_string()
 }
 
@@ -75,5 +113,13 @@ mod tests {
         let md = "- [x] done\n- [ ] todo";
         let html = render_markdown(md);
         assert!(html.contains("done"));
+    }
+
+    #[test]
+    fn telegram_spoiler_and_mark() {
+        let md = "||secret==highlight==";
+        let html = render_markdown(&md);
+        assert!(html.contains("tg-spoiler") || html.contains("secret"));
+        assert!(html.contains("mark") || html.contains("highlight"));
     }
 }

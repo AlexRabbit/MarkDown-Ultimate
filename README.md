@@ -1,6 +1,6 @@
 # MarkDown Ultimate ✨
 
-Lightweight **markdown viewer and editor** (Rust + Leptos). Works in the browser on GitHub Pages; your files stay in **local storage** on your device.
+Lightweight **markdown viewer and editor** (Rust + Leptos). GitHub Pages for online use; workspace stays in **browser local storage**. Optional **Actix engine** for local API + persistence.
 
 **Author:** AlexRabbit · **Repo:** [MarkDown-Ultimate](https://github.com/AlexRabbit/MarkDown-Ultimate)
 
@@ -8,40 +8,36 @@ Lightweight **markdown viewer and editor** (Rust + Leptos). Works in the browser
 
 1. Clone this repository.
 2. Double-click **`Launch-MarkDownUltimate.bat`** at the repo root.
-3. The app opens in your browser. Use **Create**, **Open**, and **Save** in the top bar.
+3. Your browser opens **`http://127.0.0.1:8765/MarkDown-Ultimate/`** — do **not** open `dist\index.html` as a file (assets will not load).
 
-If the launcher says build failed, install [Rust stable](https://rustup.rs/) and Visual Studio Build Tools (C++), then run the `.bat` again.
+Use **Create**, **Open**, **Save**, and **How to Use** in the header.
 
-## Online use
+## Online app (live site)
 
-After GitHub Actions runs, open **Settings → Pages** and enable **GitHub Actions** as the source. The site lives at:
+**Use the web app here:** [https://alexrabbit.github.io/MarkDown-Ultimate/](https://alexrabbit.github.io/MarkDown-Ultimate/)
 
-`https://alexrabbit.github.io/MarkDown-Ultimate/`
+The GitHub repository page is source code only; the editor runs on **GitHub Pages** at the link above.
 
 ## Features
 
 | Area | Behavior |
 | --- | --- |
-| Sidebar | Files listed newest-first |
-| Editor | **Preview** (rendered GFM/HTML) or **Markdown** (source); both editable |
-| Save | Export **Markdown**, **PDF** (print dialog), or **WorkFlow** (`.mdu.json` container) |
-| Open | Import markdown or WorkFlow (picker wiring in progress) |
-| Create | New `.md` tab without replacing the current file |
-| Formatting | Quick-insert menu for headings, bold, lists, tables |
+| Sidebar | Folder tree, newest-first files, drag-and-drop, right-click folder/rename/delete |
+| Editor | **Preview** (split + KaTeX) or **Markdown** source; both editable |
+| Formats | Toolbar + right-click insert (GFM, spoiler, mark, math, details, …) |
+| Save | Export **Markdown**, **PDF** (print), **WorkFlow** (`.mdu.json`) |
+| Open | Import `.md` or WorkFlow via file picker |
+| Tour | **How to Use** only (`#btnHowTo`); first-visit pulse stops at 60s or click |
+| Diagnostics | In-app event tail + export |
 
-Markdown engine: **CommonMark + GFM** via Comrak, with sanitized HTML and partial **Telegram-rich** HTML passthrough.
-
-## Local full stack (optional)
+## Local engine (optional)
 
 ```powershell
+docker compose -f system/docker-compose.yml up -d
 cargo run -p markdown_ultimate_engine
 ```
 
-Serves `dist/` and `GET /health` on `127.0.0.1:8080` (configure in `.env`).
-
-## Project layout
-
-`code/` · `engine/` · `databases/` · `system/` · `frontend/` · `apps/` · `modules/` · `aimemos/` · `bot/` · `logs/` · `QTestings/`
+Serves `dist/` and `GET/PUT /api/workspace` on `ENGINE_BIND` from `.env`.
 
 ## Tests
 
@@ -49,13 +45,9 @@ Serves `dist/` and `GET /health` on `127.0.0.1:8080` (configure in `.env`).
 .\QTestings\run-all.ps1
 ```
 
-## Troubleshooting
+## Layout
 
-| Issue | Fix |
-| --- | --- |
-| `link.exe` / `kernel32.lib` missing | Open **Developer PowerShell for VS**, then build |
-| Blank page on Pages | Check repo Pages source = GitHub Actions; base path `/MarkDown-Ultimate/` |
-| Data gone | Browser storage cleared — export WorkFlow regularly |
+`code/` · `engine/` · `databases/` · `system/` · `frontend/` · `apps/` · `modules/` · `aimemos/` · `bot/` · `logs/` · `QTestings/`
 
 ## License
 

@@ -27,6 +27,11 @@ jobs:
       - name: Build frontend
         working-directory: frontend
         run: trunk build --release
+      - name: Pages metadata
+        run: |
+          touch dist/.nojekyll
+          test -f dist/index.html
+          test -f dist/js/mdu-ui.js
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:

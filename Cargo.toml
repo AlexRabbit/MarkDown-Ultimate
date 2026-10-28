@@ -6,6 +6,7 @@ members = [
     "modules/markdown_core",
     "modules/workflow",
     "modules/workspace",
+    "databases",
     "engine",
     "frontend",
 ]

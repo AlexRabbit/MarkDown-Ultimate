@@ -1,0 +1,54 @@
+[
+  {
+    "name": "gfm_table",
+    "markdown": "| a | b |\n|---|---|\n| 1 | 2 |",
+    "expect_contains": ["<table", "1"]
+  },
+  {
+    "name": "task_list",
+    "markdown": "- [x] done\n- [ ] todo",
+    "expect_contains": ["done", "todo"]
+  },
+  {
+    "name": "strikethrough",
+    "markdown": "~~removed~~",
+    "expect_contains": ["removed"]
+  },
+  {
+    "name": "fenced_code",
+    "markdown": "```rust\nfn main() {}\n```",
+    "expect_contains": ["<code", "fn main"]
+  },
+  {
+    "name": "blockquote",
+    "markdown": "> quote\n> line",
+    "expect_contains": ["blockquote", "quote"]
+  },
+  {
+    "name": "telegram_spoiler",
+    "markdown": "before ||hidden|| after",
+    "expect_contains": ["tg-spoiler", "hidden"]
+  },
+  {
+    "name": "telegram_mark",
+    "markdown": "plain ==marked== text",
+    "expect_contains": ["<mark>", "marked"]
+  },
+  {
+    "name": "autolink",
+    "markdown": "see https://example.com/path",
+    "expect_contains": ["example.com"]
+  },
+  {
+    "name": "heading",
+    "markdown": "## Title",
+    "expect_contains": ["Title", "h2"]
+  },
+  {
+    "name": "comrak_nested_emphasis_gap",
+    "markdown": "*a *b* c*",
+    "expect_contains": ["a"],
+    "skip": false,
+    "expect_not_contains": []
+  }
+]

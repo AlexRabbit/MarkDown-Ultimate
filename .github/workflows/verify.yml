@@ -1,0 +1,18 @@
+name: Verify
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Run tests
+        run: cargo test -p mu_config -p mu_diagnostics -p mu_workflow -p mu_workspace -p mu_markdown_core -p mu_persistence
+      - name: Tour coverage
+        shell: pwsh
+        run: ./QTestings/tour-coverage.ps1

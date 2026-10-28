@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "honcho": {
+      "command": "bun",
+      "args": [
+        "run",
+        "C:/Users/robots/.honcho/plugins/cursor-honcho/plugins/honcho/mcp-server.ts"
+      ],
+      "env": {
+        "HONCHO_HOST": "cursor",
+        "HONCHO_API_KEY": "local-cursor",
+        "HONCHO_ENDPOINT": "http://127.0.0.1:8000/v3",
+        "HONCHO_PROJECT_ROOT": "A:\\VibeCode\\MarkDown Ultimate"
+      }
+    }
+  }
+}

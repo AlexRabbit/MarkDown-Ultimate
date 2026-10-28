@@ -11,6 +11,10 @@ pub struct AppConfig {
     pub app_mode: String,
     pub log_level: String,
     pub github_pages_base: String,
+    pub logs_dir: String,
+    pub engine_bind: String,
+    pub aerospike_hosts: String,
+    pub nats_url: String,
 }
 
 impl Default for AppConfig {
@@ -19,6 +23,10 @@ impl Default for AppConfig {
             app_mode: "production".into(),
             log_level: "info".into(),
             github_pages_base: "/MarkDown-Ultimate/".into(),
+            logs_dir: "logs".into(),
+            engine_bind: "127.0.0.1:8080".into(),
+            aerospike_hosts: "127.0.0.1:3000".into(),
+            nats_url: "nats://127.0.0.1:4222".into(),
         }
     }
 }
@@ -41,6 +49,18 @@ pub fn load_from_env_file(path: impl AsRef<Path>) -> Result<AppConfig, ConfigErr
     }
     if let Some(v) = map.get("GITHUB_PAGES_BASE") {
         cfg.github_pages_base = v.clone();
+    }
+    if let Some(v) = map.get("LOGS_DIR") {
+        cfg.logs_dir = v.clone();
+    }
+    if let Some(v) = map.get("ENGINE_BIND") {
+        cfg.engine_bind = v.clone();
+    }
+    if let Some(v) = map.get("AEROSPIKE_HOSTS") {
+        cfg.aerospike_hosts = v.clone();
+    }
+    if let Some(v) = map.get("NATS_URL") {
+        cfg.nats_url = v.clone();
     }
     Ok(cfg)
 }
