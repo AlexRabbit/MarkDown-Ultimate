@@ -27,26 +27,41 @@
   {
     "element": "#sidebarTree",
     "title": "Workspace",
-    "description": "Files and folders, newest first. Right-click for folder actions; drag to reorder or nest."
+    "description": "Files and folders, newest first. Use + for folders, ⋮ on folders, drag to reorder or nest."
   },
   {
-    "element": "#modePreview",
-    "title": "Preview",
-    "description": "Split view: edit source on the left, rendered output on the right."
+    "element": "#btnNewFolder",
+    "title": "New folder",
+    "description": "Creates a folder at the workspace root."
   },
   {
-    "element": "#modeSource",
+    "element": "#modeMarkdown",
     "title": "Markdown",
     "description": "Full-width source editor."
   },
   {
-    "element": "#editorArea",
-    "title": "Editor",
-    "description": "Right-click here for formatting shortcuts. Both modes stay editable."
+    "element": "#modeBoth",
+    "title": "Both",
+    "description": "Side-by-side source and rendered preview."
   },
   {
-    "element": "#formatBar",
-    "title": "Quick formats",
-    "description": "One-click inserts for common Markdown constructs."
+    "element": "#modePreviewOnly",
+    "title": "Preview",
+    "description": "Rendered preview with a transparent source layer so you can still edit."
+  },
+  {
+    "element": "#editorArea",
+    "title": "Editor",
+    "description": "Edit in any view mode. Use the tools sidebar for formatting."
+  },
+  {
+    "element": "#btnToolsToggle",
+    "title": "Tools",
+    "description": "Open the resizable Markdown tools panel on the right."
+  },
+  {
+    "element": "#toolsSidebar",
+    "title": "Editor tools",
+    "description": "Select text, then apply Bold, lists, tables, math, and more. Drag the left edge to resize."
   }
 ]

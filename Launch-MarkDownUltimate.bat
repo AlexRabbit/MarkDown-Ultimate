@@ -18,21 +18,38 @@ if not exist "dist\index.html" (
 )
 
 if not exist "dist\index.html" (
-  echo Build failed — dist\index.html not found.
+  echo Build failed - dist\index.html not found.
   pause
   exit /b 1
 )
 
-echo Starting local web server (required — do not open index.html as a file).
-powershell -ExecutionPolicy Bypass -File "%~dp0tools\Open-LocalWebApp.ps1"
-if errorlevel 1 (
-  echo Could not start local server.
-  pause
-  exit /b 1
-)
+if "%MDU_PORT%"=="" set "MDU_PORT=8765"
 
+where python >nul 2>&1
+if %errorlevel%==0 (
+  set "PYEXE=python"
+  set "PYARG="
+  goto :start_server
+)
+where py >nul 2>&1
+if %errorlevel%==0 (
+  set "PYEXE=py"
+  set "PYARG=-3"
+  goto :start_server
+)
+echo Python is required for the local web server.
+echo Install from https://www.python.org/downloads/ then run this launcher again.
+pause
+exit /b 1
+
+:start_server
+echo Starting local web server - do not open index.html as a file.
+set "MDU_PORT=%MDU_PORT%"
+start "" /B %PYEXE% %PYARG% "%~dp0tools\serve_dist.py"
+timeout /t 2 /nobreak >nul
+start "" "http://127.0.0.1:%MDU_PORT%/MarkDown-Ultimate/"
 echo.
-echo App opened in your browser at http://127.0.0.1:8765/MarkDown-Ultimate/
-echo Leave this window open while you use the app, or close to stop the server.
+echo MarkDown Ultimate: http://127.0.0.1:%MDU_PORT%/MarkDown-Ultimate/
+echo Leave this window open while you use the app.
 echo.
 pause

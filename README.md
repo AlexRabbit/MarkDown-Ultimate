@@ -1,54 +1,169 @@
-# MarkDown Ultimate ✨
+# MarkDown Ultimate
 
-Lightweight **markdown viewer and editor** (Rust + Leptos). GitHub Pages for online use; workspace stays in **browser local storage**. Optional **Actix engine** for local API + persistence.
+**Author:** [AlexRabbit](https://github.com/AlexRabbit)  
+**License:** MIT  
+**Live app:** [https://alexrabbit.github.io/MarkDown-Ultimate/](https://alexrabbit.github.io/MarkDown-Ultimate/)
 
-**Author:** AlexRabbit · **Repo:** [MarkDown-Ultimate](https://github.com/AlexRabbit/MarkDown-Ultimate)
+---
 
 ## Quick start (Windows)
 
-1. Clone this repository.
-2. Double-click **`Launch-MarkDownUltimate.bat`** at the repo root.
-3. Your browser opens **`http://127.0.0.1:8765/MarkDown-Ultimate/`** — do **not** open `dist\index.html` as a file (assets will not load).
+1. **Download or clone** this repository to a folder on your PC.
+2. **Double-click** `Launch-MarkDownUltimate.bat` at the **root** of the project (same folder as this README).
+3. Wait a few seconds. Your default browser should open:
+   **`http://127.0.0.1:8765/MarkDown-Ultimate/`**
+4. You should see the MarkDown Ultimate header (**Create**, **Open**, **Save**, **How to Use**) and the file sidebar on the left.
 
-Use **Create**, **Open**, **Save**, and **How to Use** in the header.
+### What success looks like
 
-## Online app (live site)
-
-**Use the web app here:** [https://alexrabbit.github.io/MarkDown-Ultimate/](https://alexrabbit.github.io/MarkDown-Ultimate/)
-
-The GitHub repository page is source code only; the editor runs on **GitHub Pages** at the link above.
-
-## Features
-
-| Area | Behavior |
+| Signal | Meaning |
 | --- | --- |
-| Sidebar | Folder tree, newest-first files, drag-and-drop, right-click folder/rename/delete |
-| Editor | **Preview** (split + KaTeX) or **Markdown** source; both editable |
-| Formats | Toolbar + right-click insert (GFM, spoiler, mark, math, details, …) |
-| Save | Export **Markdown**, **PDF** (print), **WorkFlow** (`.mdu.json`) |
-| Open | Import `.md` or WorkFlow via file picker |
-| Tour | **How to Use** only (`#btnHowTo`); first-visit pulse stops at 60s or click |
-| Diagnostics | In-app event tail + export |
+| Browser shows the editor UI | Local server and WASM app loaded correctly |
+| URL starts with `http://127.0.0.1:8765` | Correct (not `file://`) |
+| First launch may take longer | Trunk builds `dist/` if missing (Rust toolchain required) |
 
-## Local engine (optional)
+### If startup fails
+
+| Problem | What to do |
+| --- | --- |
+| Blank page / broken layout | Do **not** open `dist\index.html` directly. Always use the `.bat` launcher or the URL above. |
+| `Python is required` | Install [Python 3](https://www.python.org/downloads/) and ensure `python` or `py` is on PATH. |
+| `dist/index.html missing` | Install [Rust](https://rustup.rs/) and [Trunk](https://trunkrs.dev/), then run `trunk build --release` inside `frontend/`. |
+| Trunk build fails on Windows | Install Visual Studio Build Tools (C++ workload) or run the `.bat` once (it tries to load vcvars). |
+| Port 8765 in use | Set environment variable `MDU_PORT=8770`, then launch again. |
+| PDF export empty | Allow pop-ups for `127.0.0.1`; PDF uses the browser print dialog on rendered content. |
+| Windows SmartScreen / "Unknown publisher" | The `.bat` is an unsigned script from this repo. Click **More info → Run anyway**, or run from a zip you trust. Signing requires a code-signing certificate (not included). |
+
+---
+
+## What this app is
+
+MarkDown Ultimate is a **browser-based Markdown workspace**: multiple files and folders, live preview, export, and optional local API engine. Documents are stored in **browser local storage** unless you use the optional Actix engine.
+
+Built with **Rust + Leptos (WASM)** for the UI and shared **markdown_core** for rendering (CommonMark/GFM-style features, KaTeX math, spoilers, etc.).
+
+---
+
+## Main features
+
+| Feature | How to use |
+| --- | --- |
+| **View modes** | Top pill: **Markdown** / **Both** / **Preview** — all modes stay editable. |
+| **Sidebar** | **+** creates folders; **⋮** on folders for rename/delete; drag files/folders to reorder or nest. |
+| **Tools panel** | **⟨ Tools** on the right — command registry (bold, H1–H6, tables, footnotes, callouts); drag the left edge to resize. |
+| **Outline** | Heading list under the file tree; click to jump in the editor. |
+| **Find / replace** | Tools → Find and replace, or **Ctrl+F**. |
+| **Shortcuts** | Tools → Keyboard shortcuts, or **Ctrl+/**. |
+| **Stats** | Word and character count in the status bar under the editor. |
+| **Create** | New untitled `.md` in the workspace. |
+| **Open** | Import `.md` (merges into workspace) or **WorkFlow** `.mdu.json` (full backup). |
+| **Save** | Export current file as `.md`, **PDF** (print dialog), or **WorkFlow** container (all files + settings). |
+| **How to Use** | Guided tour (never auto-starts). |
+| **Diagnostics** | Recent in-app events + export. |
+
+---
+
+## Online use (no install)
+
+Open the GitHub Pages build (same UI, no local Python server):
+
+**[https://alexrabbit.github.io/MarkDown-Ultimate/](https://alexrabbit.github.io/MarkDown-Ultimate/)**
+
+The GitHub **repository** page is source only; the editor runs on **Pages** at the link above.
+
+---
+
+## Prerequisites
+
+| Component | Required for | Install |
+| --- | --- | --- |
+| **Windows 10/11** | `.bat` launcher | — |
+| **Python 3** | Local static server | python.org |
+| **Rust + wasm32 target** | Rebuild frontend | rustup + `rustup target add wasm32-unknown-unknown` |
+| **Trunk** | `dist/` build | `cargo install trunk` |
+| **Docker** (optional) | Aerospike/NATS stack | Docker Desktop |
+| **Node** (optional) | CI only | For GitHub Actions if you fork |
+
+---
+
+## Configuration
+
+Copy `.env.example` to `.env` for the **optional engine** (not required for the browser app):
+
+```env
+ENGINE_BIND=127.0.0.1:8080
+```
+
+Never commit `.env` — it is listed in `.gitignore`.
+
+---
+
+## Optional local engine
 
 ```powershell
 docker compose -f system/docker-compose.yml up -d
 cargo run -p markdown_ultimate_engine
 ```
 
-Serves `dist/` and `GET/PUT /api/workspace` on `ENGINE_BIND` from `.env`.
+Engine serves `dist/` and workspace API on the bind address from `.env`.
 
-## Tests
+---
+
+## Development and tests
 
 ```powershell
+cd frontend
+trunk serve
+
 .\QTestings\run-all.ps1
+
+.\QTestings\prepare-release.ps1
 ```
 
-## Layout
+Output upload snapshot: `release\MarkDown-Ultimate\`
 
-`code/` · `engine/` · `databases/` · `system/` · `frontend/` · `apps/` · `modules/` · `aimemos/` · `bot/` · `logs/` · `QTestings/`
+---
 
-## License
+## Project layout
 
-MIT — Copyright (c) AlexRabbit
+| Path | Purpose |
+| --- | --- |
+| `frontend/` | Leptos WASM UI, styles, tour, tools sidebar |
+| `modules/` | Workspace tree, markdown core, workflow import/export |
+| `engine/` | Optional Actix HTTP API |
+| `code/` | Shared config and diagnostics |
+| `system/` | Docker compose for local databases |
+| `tools/` | Local server + launcher helpers |
+| `QTestings/` | Tests and release prep scripts |
+| `dist/` | Built static site (generated) |
+
+---
+
+## Troubleshooting logs
+
+| Location | Content |
+| --- | --- |
+| In-app **Diagnostics** | Structured frontend events |
+| `logs/` | Project log layout (see `logs/README.md`) |
+| Browser devtools console | WASM/JS errors |
+
+---
+
+## Security
+
+- No secrets belong in the repo; use `.env.example` templates only.
+- See `release/SECURITY_CHECK.md` after running `prepare-release.ps1`.
+
+---
+
+## License and credits
+
+**MIT License** — Copyright (c) AlexRabbit
+
+Third-party assets (KaTeX, Driver.js, etc.) remain under their respective licenses in the frontend build.
+
+---
+
+## Maintainer
+
+**AlexRabbit** — [GitHub](https://github.com/AlexRabbit/MarkDown-Ultimate)

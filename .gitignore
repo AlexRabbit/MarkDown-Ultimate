@@ -6,7 +6,9 @@
 /logs/incidents/*
 **/logs/hot/*.jsonl
 !/logs/README.md
-.Didea/
+.idea/
 .vscode/
+.cursor/
+aimemos/
 *.pdb
 release/

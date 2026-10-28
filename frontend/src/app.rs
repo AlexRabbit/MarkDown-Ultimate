@@ -2,13 +2,19 @@ use gloo_storage::{LocalStorage, Storage};
 use leptos::prelude::*;
 use mu_diagnostics::{emit, recent_events, Severity};
 use mu_markdown_core::render_markdown;
-use mu_workflow::{export_container, import_container};
+use mu_workflow::{export_container, import_container, WorkflowMeta, WORKFLOW_MAGIC};
 use mu_workspace::{Node, Workspace};
 use wasm_bindgen::closure::Closure;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{Blob, BlobPropertyBag, FileReader, RequestMode, Url};
+
+use crate::command_registry::{command_by_id, shortcut_lines, CommandKind, EditorCommand};
+use crate::editor_commands::{find_replace, init_editor_shortcuts, jump_to_offset, print_markdown};
+use crate::tools_sidebar::{
+    load_tools_open, load_tools_width, run_command_on_editor, ToolsSidebar,
+};
 
 const STORAGE_KEY: &str = "mdu_workspace_v1";
 const PULSE_KEY: &str = "mdu_howto_pulse_seen";
@@ -23,9 +29,163 @@ extern "C" {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum EditorMode {
-    Rendered,
-    Source,
+enum ViewMode {
+    Markdown,
+    Split,
+    Preview,
+}
+
+const VIEW_MODE_KEY: &str = "mdu_view_mode_v1";
+
+fn load_view_mode() -> ViewMode {
+    LocalStorage::get::<String>(VIEW_MODE_KEY)
+        .ok()
+        .and_then(|s| parse_view_mode(&s))
+        .unwrap_or(ViewMode::Split)
+}
+
+fn parse_view_mode(s: &str) -> Option<ViewMode> {
+    match s {
+        "markdown" => Some(ViewMode::Markdown),
+        "split" => Some(ViewMode::Split),
+        "preview" => Some(ViewMode::Preview),
+        _ => None,
+    }
+}
+
+fn view_mode_storage(mode: ViewMode) -> String {
+    match mode {
+        ViewMode::Markdown => "markdown".into(),
+        ViewMode::Split => "split".into(),
+        ViewMode::Preview => "preview".into(),
+    }
+}
+
+fn view_class(mode: ViewMode) -> &'static str {
+    match mode {
+        ViewMode::Markdown => "markdown",
+        ViewMode::Split => "split",
+        ViewMode::Preview => "preview",
+    }
+}
+
+fn export_filename(ws: &Workspace, active_id: &str) -> String {
+    ws.flatten_file_entries()
+        .into_iter()
+        .find(|e| e.id == active_id)
+        .map(|e| {
+            e.path
+                .rsplit('/')
+                .next()
+                .unwrap_or(&e.path)
+                .to_string()
+        })
+        .unwrap_or_else(|| "document.md".into())
+}
+
+fn unique_import_name(ws: &Workspace, fname: &str) -> String {
+    let mut name = if fname.is_empty() {
+        "imported.md".to_string()
+    } else if !fname.to_lowercase().ends_with(".md") && !fname.to_lowercase().ends_with(".markdown") {
+        format!("{fname}.md")
+    } else {
+        fname.to_string()
+    };
+    let existing: std::collections::HashSet<String> = ws
+        .flatten_file_entries()
+        .into_iter()
+        .map(|e| {
+            e.path
+                .rsplit('/')
+                .next()
+                .unwrap_or(&e.path)
+                .to_string()
+        })
+        .collect();
+    if !existing.contains(&name) {
+        return name;
+    }
+    let stem = name
+        .trim_end_matches(".markdown")
+        .trim_end_matches(".md");
+    for n in 1..1000 {
+        let candidate = format!("{stem}-{n}.md");
+        if !existing.contains(&candidate) {
+            return candidate;
+        }
+    }
+    format!("import-{}.md", short_id())
+}
+
+fn doc_stats(text: &str) -> (usize, usize) {
+    let chars = text.chars().count();
+    let words = text.split_whitespace().count();
+    (words, chars)
+}
+
+fn scan_headings(text: &str) -> Vec<(u8, String, usize)> {
+    let mut pos = 0usize;
+    let mut out = Vec::new();
+    for line in text.split('\n') {
+        let trimmed = line.trim_start();
+        let hashes = trimmed.chars().take_while(|&c| c == '#').count();
+        if (1..=6).contains(&hashes) {
+            let title_part = trimmed.get(hashes..).unwrap_or("").trim();
+            if !title_part.is_empty() {
+                out.push((hashes as u8, title_part.to_string(), pos));
+            }
+        }
+        pos += line.len() + 1;
+    }
+    out
+}
+
+fn editor_body(
+    mode: ViewMode,
+    content: ReadSignal<String>,
+    set_content: WriteSignal<String>,
+    save: impl Fn(String) + Copy + 'static,
+) -> AnyView {
+    match mode {
+        ViewMode::Markdown => view! {
+            <div class="editor-surface source-only">
+                <textarea id="mduSourceEditor" class="source" spellcheck="true"
+                    prop:value=move || content.get()
+                    on:input=move |ev| {
+                        let ta: web_sys::HtmlTextAreaElement = event_target(&ev);
+                        let v = ta.value();
+                        set_content.set(v.clone());
+                        save(v);
+                    }></textarea>
+            </div>
+        }.into_any(),
+        ViewMode::Split => view! {
+            <div class="editor-surface split">
+                <textarea id="mduSourceEditor" class="source inline" spellcheck="true"
+                    prop:value=move || content.get()
+                    on:input=move |ev| {
+                        let ta: web_sys::HtmlTextAreaElement = event_target(&ev);
+                        let v = ta.value();
+                        set_content.set(v.clone());
+                        save(v);
+                    }></textarea>
+                <div id="previewPane" class="preview" inner_html=move || render_markdown(&content.get())></div>
+            </div>
+        }.into_any(),
+        ViewMode::Preview => view! {
+            <div class="editor-surface preview-mode">
+                <textarea id="mduSourceEditor" class="source preview-overlay" spellcheck="true"
+                    prop:value=move || content.get()
+                    on:input=move |ev| {
+                        let ta: web_sys::HtmlTextAreaElement = event_target(&ev);
+                        let v = ta.value();
+                        set_content.set(v.clone());
+                        save(v);
+                    }></textarea>
+                <div id="previewPane" class="preview preview-front" inner_html=move || render_markdown(&content.get())></div>
+            </div>
+        }.into_any(),
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -34,6 +194,8 @@ enum ModalKind {
     Export,
     Import,
     Diagnostics,
+    FindReplace,
+    Shortcuts,
 }
 
 #[derive(Clone)]
@@ -48,13 +210,15 @@ enum MenuTarget {
 pub fn App() -> impl IntoView {
     let (workspace, set_workspace) = signal(load_workspace());
     let (active_id, set_active_id) = signal(default_active(&workspace.get_untracked()));
-    let (editor_mode, set_editor_mode) = signal(EditorMode::Rendered);
+    let (view_mode, set_view_mode) = signal(load_view_mode());
     let (modal, set_modal) = signal(ModalKind::None);
     let (content, set_content) = signal(String::new());
     let (show_pulse, set_show_pulse) = signal(!LocalStorage::get::<bool>(PULSE_KEY).unwrap_or(false));
     let (menu, set_menu) = signal((MenuTarget::None, 0i32, 0i32));
     let (drag_id, set_drag_id) = signal(String::new());
     let (engine_online, set_engine_online) = signal(false);
+    let (tools_open, set_tools_open) = signal(load_tools_open());
+    let (tools_width, set_tools_width) = signal(load_tools_width());
 
     if show_pulse.get_untracked() && !LocalStorage::get::<bool>(PULSE_KEY).unwrap_or(false) {
         schedule_pulse_stop(set_show_pulse);
@@ -74,7 +238,8 @@ pub fn App() -> impl IntoView {
 
     Effect::new(move || {
         let _ = content.get();
-        if editor_mode.get() == EditorMode::Rendered {
+        let mode = view_mode.get();
+        if mode == ViewMode::Split || mode == ViewMode::Preview {
             schedule_math_render();
         }
     });
@@ -102,6 +267,70 @@ pub fn App() -> impl IntoView {
         if update_content(&mut ws, &active_id.get_untracked(), text) {
             persist.run(ws);
         }
+    };
+
+    let run_command_cb = {
+        let save_content = save_content;
+        Callback::new(move |cmd: EditorCommand| {
+            if cmd.kind == CommandKind::Modal {
+                match cmd.action {
+                    "find-replace" => set_modal.set(ModalKind::FindReplace),
+                    "shortcuts" => set_modal.set(ModalKind::Shortcuts),
+                    _ => {}
+                }
+            } else {
+                run_command_on_editor(cmd, set_content, save_content);
+            }
+        })
+    };
+
+    Effect::new({
+        let save_content = save_content;
+        let set_modal = set_modal;
+        move |_| {
+            init_editor_shortcuts();
+            let window = web_sys::window().unwrap();
+            let modal_closure = Closure::wrap(Box::new(move |ev: web_sys::CustomEvent| {
+                if let Some(id) = ev.detail().as_string() {
+                    match id.as_str() {
+                        "find-replace" => set_modal.set(ModalKind::FindReplace),
+                        "shortcuts" => set_modal.set(ModalKind::Shortcuts),
+                        _ => {
+                            if let Some(cmd) = command_by_id(&id) {
+                                if cmd.kind == CommandKind::Modal {
+                                    match cmd.action {
+                                        "find-replace" => set_modal.set(ModalKind::FindReplace),
+                                        "shortcuts" => set_modal.set(ModalKind::Shortcuts),
+                                        _ => {}
+                                    }
+                                } else {
+                                    run_command_on_editor(*cmd, set_content, save_content);
+                                }
+                            }
+                        }
+                    }
+                }
+            }) as Box<dyn FnMut(_)>);
+            let _ = window.add_event_listener_with_callback("mdu-open-modal", modal_closure.as_ref().unchecked_ref());
+            modal_closure.forget();
+
+            let cmd_closure = Closure::wrap(Box::new(move |ev: web_sys::CustomEvent| {
+                if let Some(id) = ev.detail().as_string() {
+                    if let Some(cmd) = command_by_id(&id) {
+                        if cmd.kind != CommandKind::Modal {
+                            run_command_on_editor(*cmd, set_content, save_content);
+                        }
+                    }
+                }
+            }) as Box<dyn FnMut(_)>);
+            let _ = window.add_event_listener_with_callback("mdu-run-command", cmd_closure.as_ref().unchecked_ref());
+            cmd_closure.forget();
+        }
+    });
+
+    let set_view = move |mode: ViewMode| {
+        set_view_mode.set(mode);
+        let _ = LocalStorage::set(VIEW_MODE_KEY, view_mode_storage(mode));
     };
 
     let start_tour = move |_| {
@@ -141,6 +370,16 @@ pub fn App() -> impl IntoView {
                         ev.prevent_default();
                         set_menu.set((MenuTarget::SidebarRoot, ev.client_x(), ev.client_y()));
                     }>
+                    <div class="sidebar-head">
+                        <span>"Files"</span>
+                        <button id="btnNewFolder" type="button" class="icon-btn" title="New folder" data-tour-id="btnNewFolder"
+                            on:click=move |_| {
+                                let mut ws = workspace.get_untracked();
+                                if ws.create_folder(None, "New folder").is_ok() {
+                                    persist.run(ws);
+                                }
+                            }>"+"</button>
+                    </div>
                     <TreeView
                         nodes=Signal::derive(move || workspace.get().sorted_root_nodes())
                         active_id=active_id
@@ -152,51 +391,62 @@ pub fn App() -> impl IntoView {
                         set_menu=set_menu
                         parent_id=None
                     />
+                    <OutlinePanel content=content />
                 </aside>
+                <div class="center-column">
                 <section class="editor-pane">
-                    <div class="mode-toggle">
-                        <button id="modePreview" type="button" data-tour-id="modePreview"
-                            class=move || if editor_mode.get()==EditorMode::Rendered {"active"} else {""}
-                            on:click=move |_| set_editor_mode.set(EditorMode::Rendered)>"Preview"</button>
-                        <button id="modeSource" type="button" data-tour-id="modeSource"
-                            class=move || if editor_mode.get()==EditorMode::Source {"active"} else {""}
-                            on:click=move |_| set_editor_mode.set(EditorMode::Source)>"Markdown"</button>
+                    <div class="view-pill" role="tablist" aria-label="Editor view mode">
+                        <button type="button" id="modeMarkdown" data-tour-id="modeSource"
+                            class=move || if view_mode.get()==ViewMode::Markdown {"pill-seg active"} else {"pill-seg"}
+                            on:click=move |_| set_view(ViewMode::Markdown)>"Markdown"</button>
+                        <button type="button" id="modeBoth" data-tour-id="modeBoth"
+                            class=move || if view_mode.get()==ViewMode::Split {"pill-seg active"} else {"pill-seg"}
+                            on:click=move |_| set_view(ViewMode::Split)>"Both"</button>
+                        <button type="button" id="modePreviewOnly" data-tour-id="modePreviewOnly"
+                            class=move || if view_mode.get()==ViewMode::Preview {"pill-seg active"} else {"pill-seg"}
+                            on:click=move |_| set_view(ViewMode::Preview)>"Preview"</button>
                     </div>
-                    <div class="editor" id="editorArea" data-tour-id="editorArea"
-                        on:contextmenu=move |ev| {
-                            ev.prevent_default();
-                            set_menu.set((MenuTarget::Editor, ev.client_x(), ev.client_y()));
-                        }>
-                        <menu class="ctx" id="formatBar" data-tour-id="formatBar">
-                            {snippet_buttons(set_content, save_content)}
-                        </menu>
-                        {move || if editor_mode.get() == EditorMode::Source {
-                            view! {
-                                <textarea class="source" prop:value=move || content.get()
-                                    on:input=move |ev| {
-                                        let v = event_target_value(&ev);
-                                        set_content.set(v.clone());
-                                        save_content(v);
-                                    } />
-                            }.into_any()
-                        } else {
-                            view! {
-                                <div class="split">
-                                    <textarea class="source inline" prop:value=move || content.get()
-                                        on:input=move |ev| {
-                                            let v = event_target_value(&ev);
-                                            set_content.set(v.clone());
-                                            save_content(v);
-                                        } />
-                                    <div class="preview" id="previewPane" inner_html=move || render_markdown(&content.get()) />
-                                </div>
-                            }.into_any()
+                    <div class="editor-row">
+                    <div class=move || format!("editor view-{}", view_class(view_mode.get())) id="editorArea" data-tour-id="editorArea">
+                        {move || editor_body(view_mode.get(), content, set_content, save_content)}
+                    </div>
+                    <ToolsSidebar open=tools_open set_open=set_tools_open width_px=tools_width set_width_px=set_tools_width run_command_cb=run_command_cb />
+                    </div>
+                    <div class="status-bar" id="docStatusBar" data-tour-id="docStatusBar">
+                        {move || {
+                            let (words, chars) = doc_stats(&content.get());
+                            format!("{words} words · {chars} characters · Ctrl+F find · Ctrl+/ shortcuts")
                         }}
                     </div>
                 </section>
+                </div>
             </div>
-            {move || context_menu_view(menu.get(), set_menu, workspace, persist.clone(), set_content, save_content)}
-            {move || modal_view(modal.get(), set_modal, workspace, content, persist.clone(), set_active_id)}
+            {move || context_menu_view(menu.get(), set_menu, workspace, persist.clone())}
+            {move || modal_view(modal.get(), set_modal, workspace, active_id, view_mode, content, set_content, save_content, persist.clone(), set_active_id, set_view_mode)}
+        </div>
+    }
+}
+
+#[component]
+fn OutlinePanel(content: ReadSignal<String>) -> impl IntoView {
+    view! {
+        <div class="outline-panel" id="docOutline" data-tour-id="docOutline">
+            <div class="outline-head">"Outline"</div>
+            <ul class="outline-list">
+                {move || {
+                    scan_headings(&content.get()).into_iter().map(|(level, title, offset)| {
+                        let off = offset as u32;
+                        view! {
+                            <li class="outline-item" style=format!("padding-left:{}rem", (level as f32 - 1.0) * 0.65 + 0.35)>
+                                <button type="button" class="outline-link"
+                                    on:click=move |_| jump_to_offset(off)>
+                                    {title}
+                                </button>
+                            </li>
+                        }
+                    }).collect_view()
+                }}
+            </ul>
         </div>
     }
 }
@@ -253,16 +503,18 @@ fn TreeView(
                         >{name}</li>
                     }.into_any(),
                     Node::Folder { name, id: fid, .. } => {
-                        let folder_id = fid.clone();
                         let folder_id_drop = fid.clone();
                         let folder_id_tree = fid.clone();
+                        let folder_id_menu = fid.clone();
+                        let folder_id_drag = fid.clone();
+                        let folder_id_parent = fid.clone();
                         view! {
                             <li class="folder-block">
-                                <div class=move || if active_id.get() == id { "row folder active" } else { "row folder" }
-                                    on:contextmenu=move |ev| {
-                                        ev.prevent_default();
-                                        ev.stop_propagation();
-                                        set_menu.set((MenuTarget::SidebarNode(id_ctx.clone()), ev.client_x(), ev.client_y()));
+                                <div class="row folder"
+                                    draggable="true"
+                                    on:dragstart=move |ev| {
+                                        set_drag_id.set(folder_id_drag.clone());
+                                        if let Some(dt) = ev.data_transfer() { let _ = dt.set_data("text/plain", &folder_id_drag); }
                                     }
                                     on:dragover=move |ev| ev.prevent_default()
                                     on:drop=move |ev| {
@@ -274,7 +526,14 @@ fn TreeView(
                                             persist.run(ws);
                                         }
                                     }
-                                >"📁 " {name.clone()}</div>
+                                >
+                                    <button type="button" class="kebab" aria-label="Folder menu"
+                                        on:click=move |ev| {
+                                            ev.stop_propagation();
+                                            set_menu.set((MenuTarget::SidebarNode(folder_id_menu.clone()), ev.client_x(), ev.client_y()));
+                                        }>"⋮"</button>
+                                    <span class="folder-name">"📁 " {name.clone()}</span>
+                                </div>
                                 <TreeView
                                     nodes=Signal::derive(move || {
                                         workspace.get().children_of(&folder_id_tree).unwrap_or_default()
@@ -286,7 +545,7 @@ fn TreeView(
                                     drag_id=drag_id
                                     set_drag_id=set_drag_id
                                     set_menu=set_menu
-                                    parent_id=Some(folder_id.clone())
+                                    parent_id=Some(folder_id_parent.clone())
                                 />
                             </li>
                         }.into_any()
@@ -302,29 +561,13 @@ fn context_menu_view(
     set_menu: WriteSignal<(MenuTarget, i32, i32)>,
     workspace: ReadSignal<Workspace>,
     persist: Callback<Workspace>,
-    set_content: WriteSignal<String>,
-    save_content: impl Fn(String) + Copy + 'static,
 ) -> AnyView {
     let (target, x, y) = menu;
-    if matches!(target, MenuTarget::None) {
+    if matches!(target, MenuTarget::None | MenuTarget::Editor) {
         return view! { <span class="hidden"></span> }.into_any();
     }
     let close = move |_| set_menu.set((MenuTarget::None, 0, 0));
     match target {
-        MenuTarget::Editor => view! {
-            <div class="ctx-menu" style=format!("left:{x}px;top:{y}px") on:click=|ev| ev.stop_propagation()>
-                <button type="button" on:click=move |_| { insert_snippet(set_content, save_content, "# Heading\n"); close(()); }>"Heading"</button>
-                <button type="button" on:click=move |_| { insert_snippet(set_content, save_content, "**bold** "); close(()); }>"Bold"</button>
-                <button type="button" on:click=move |_| { insert_snippet(set_content, save_content, "*italic* "); close(()); }>"Italic"</button>
-                <button type="button" on:click=move |_| { insert_snippet(set_content, save_content, "||spoiler|| "); close(()); }>"Spoiler"</button>
-                <button type="button" on:click=move |_| { insert_snippet(set_content, save_content, "==mark== "); close(()); }>"Mark"</button>
-                <button type="button" on:click=move |_| { insert_snippet(set_content, save_content, "$$\\nE=mc^2\\n$$\\n"); close(()); }>"Math block"</button>
-                <button type="button" on:click=move |_| { insert_snippet(set_content, save_content, "| H | V |\\n|---|---|\\n| | |\\n"); close(()); }>"Table"</button>
-                <button type="button" on:click=move |_| { insert_snippet(set_content, save_content, "- [ ] task\\n"); close(()); }>"Task"</button>
-                <button type="button" on:click=move |_| { insert_snippet(set_content, save_content, "> quote\\n"); close(()); }>"Quote"</button>
-                <button type="button" on:click=move |_| { insert_snippet(set_content, save_content, "<details><summary>Title</summary>\\n\\nBody\\n</details>\\n"); close(()); }>"Details"</button>
-            </div>
-        }.into_any(),
         MenuTarget::SidebarRoot | MenuTarget::SidebarNode(_) => {
             let node_id = match &target {
                 MenuTarget::SidebarNode(id) => Some(id.clone()),
@@ -368,7 +611,7 @@ fn context_menu_view(
                 </div>
             }.into_any()
         }
-        MenuTarget::None => view! { <span class="hidden"></span> }.into_any(),
+        MenuTarget::None | MenuTarget::Editor => view! { <span class="hidden"></span> }.into_any(),
     }
 }
 
@@ -376,9 +619,14 @@ fn modal_view(
     kind: ModalKind,
     set_modal: WriteSignal<ModalKind>,
     workspace: ReadSignal<Workspace>,
+    active_id: ReadSignal<String>,
+    view_mode: ReadSignal<ViewMode>,
     content: ReadSignal<String>,
+    set_content: WriteSignal<String>,
+    save_content: impl Fn(String) + Copy + 'static,
     persist: Callback<Workspace>,
     set_active_id: WriteSignal<String>,
+    set_view_mode: WriteSignal<ViewMode>,
 ) -> AnyView {
     match kind {
         ModalKind::None => view! { <span class="hidden"></span> }.into_any(),
@@ -387,17 +635,28 @@ fn modal_view(
                 <div class="modal" on:click=|ev| ev.stop_propagation()>
                     <h2>"Export"</h2>
                     <button type="button" on:click=move |_| {
-                        trigger_download("document.md", &content.get_untracked(), "text/markdown");
+                        let ws = workspace.get_untracked();
+                        let name = export_filename(&ws, &active_id.get_untracked());
+                        trigger_download(&name, &content.get_untracked(), "text/markdown");
                         emit(Severity::Info, "export", "markdown", "frontend", "md export", None, None);
                         set_modal.set(ModalKind::None);
                     }>"Markdown (.md)"</button>
                     <button type="button" on:click=move |_| {
-                        web_sys::window().and_then(|w| { let _ = w.print(); Some(()) });
+                        let ws = workspace.get_untracked();
+                        let title = export_filename(&ws, &active_id.get_untracked());
+                        let html = render_markdown(&content.get_untracked());
                         set_modal.set(ModalKind::None);
+                        print_markdown(&title, &html);
+                        emit(Severity::Info, "export", "pdf", "frontend", "print document", None, None);
                     }>"PDF (print dialog)"</button>
                     <button type="button" on:click=move |_| {
-                        if let Ok(raw) = export_container(workspace.get_untracked().to_json()) {
-                            trigger_download("workflow.mdu.json", &raw, "application/json");
+                        let ws = workspace.get_untracked();
+                        let meta = WorkflowMeta {
+                            active_file_id: Some(active_id.get_untracked()),
+                            view_mode: Some(view_mode_storage(view_mode.get_untracked())),
+                        };
+                        if let Ok(raw) = export_container(ws.to_json(), meta) {
+                            trigger_download("MarkDown-Ultimate.mdu.json", &raw, "application/json");
                             emit(Severity::Info, "export", "workflow", "frontend", "workflow export", None, None);
                         }
                         set_modal.set(ModalKind::None);
@@ -415,9 +674,17 @@ fn modal_view(
                             let input: web_sys::HtmlInputElement = event_target(&ev);
                             if let Some(file) = input.files().and_then(|f| f.get(0)) {
                                 let fname = file.name();
+                                let current = workspace.get_untracked();
                                 wasm_bindgen_futures::spawn_local(async move {
                                     match read_file_text(file).await {
-                                        Ok(text) => handle_import_text(text, fname, persist.clone(), set_active_id),
+                                        Ok(text) => handle_import_text(
+                                            text,
+                                            fname,
+                                            persist.clone(),
+                                            set_active_id,
+                                            set_view_mode,
+                                            current,
+                                        ),
                                         Err(e) => emit(Severity::Error, "import", "read_failed", "frontend", e, None, None),
                                     }
                                 });
@@ -441,6 +708,63 @@ fn modal_view(
                 </div>
             }.into_any()
         }
+        ModalKind::FindReplace => view! {
+            <FindReplaceModal set_modal=set_modal set_content=set_content save_content=save_content />
+        }.into_any(),
+        ModalKind::Shortcuts => {
+            let rows = shortcut_lines();
+            view! {
+                <div class="modal-backdrop" role="dialog" aria-modal="true" on:click=move |_| set_modal.set(ModalKind::None)>
+                    <div class="modal modal-wide" on:click=|ev| ev.stop_propagation()>
+                        <h2>"Keyboard shortcuts"</h2>
+                        <ul class="shortcut-list">
+                            {rows.into_iter().map(|(key, label)| view! {
+                                <li><code>{key}</code>" — "{label}</li>
+                            }).collect_view()}
+                            <li><code>"Ctrl+F"</code>" — Find and replace dialog"</li>
+                        </ul>
+                        <button type="button" on:click=move |_| set_modal.set(ModalKind::None)>"Close"</button>
+                    </div>
+                </div>
+            }.into_any()
+        }
+    }
+}
+
+#[component]
+fn FindReplaceModal(
+    set_modal: WriteSignal<ModalKind>,
+    set_content: WriteSignal<String>,
+    save_content: impl Fn(String) + Copy + 'static,
+) -> impl IntoView {
+    let (find, set_find) = signal(String::new());
+    let (replace, set_replace) = signal(String::new());
+    view! {
+        <div class="modal-backdrop" role="dialog" aria-modal="true" on:click=move |_| set_modal.set(ModalKind::None)>
+            <div class="modal" on:click=|ev| ev.stop_propagation()>
+                <h2>"Find and replace"</h2>
+                <label>"Find"<input type="text" prop:value=move || find.get()
+                    on:input=move |ev| set_find.set(event_target_value(&ev)) /></label>
+                <label>"Replace"<input type="text" prop:value=move || replace.get()
+                    on:input=move |ev| set_replace.set(event_target_value(&ev)) /></label>
+                <div class="modal-actions">
+                    <button type="button" on:click=move |_| {
+                        if let Some(v) = find_replace(&find.get_untracked(), &replace.get_untracked(), false) {
+                            set_content.set(v.clone());
+                            save_content(v);
+                        }
+                    }>"Replace next"</button>
+                    <button type="button" on:click=move |_| {
+                        if let Some(v) = find_replace(&find.get_untracked(), &replace.get_untracked(), true) {
+                            set_content.set(v.clone());
+                            save_content(v);
+                            set_modal.set(ModalKind::None);
+                        }
+                    }>"Replace all"</button>
+                    <button type="button" on:click=move |_| set_modal.set(ModalKind::None)>"Close"</button>
+                </div>
+            </div>
+        </div>
     }
 }
 
@@ -449,23 +773,33 @@ fn handle_import_text(
     fname: String,
     persist: Callback<Workspace>,
     set_active_id: WriteSignal<String>,
+    set_view_mode: WriteSignal<ViewMode>,
+    current: Workspace,
 ) {
     let lower = fname.to_lowercase();
-    if lower.ends_with(".mdu.json") || lower.ends_with(".json") {
+    if lower.ends_with(".mdu.json") || (lower.ends_with(".json") && text.contains(WORKFLOW_MAGIC)) {
         match import_container(&text) {
-            Ok(tree) => {
+            Ok((tree, meta)) => {
                 let ws = Workspace::from_json(tree);
                 persist.run(ws.clone());
-                if let Some((id, _)) = ws.flatten_files_newest_first().first().cloned() {
+                if let Some(id) = meta.active_file_id.filter(|id| find_content(&ws, id).is_some()) {
                     set_active_id.set(id);
+                } else if let Some((id, _)) = ws.flatten_files_newest_first().first().cloned() {
+                    set_active_id.set(id);
+                }
+                if let Some(vm) = meta.view_mode.as_deref() {
+                    if let Some(mode) = parse_view_mode(vm) {
+                        set_view_mode.set(mode);
+                        let _ = LocalStorage::set(VIEW_MODE_KEY, vm);
+                    }
                 }
                 emit(Severity::Info, "import", "workflow", "frontend", "workflow imported", None, None);
             }
             Err(e) => emit(Severity::Error, "import", "workflow_invalid", "frontend", e.to_string(), None, None),
         }
     } else {
-        let mut ws = Workspace::default();
-        let name = if fname.is_empty() { "imported.md".into() } else { fname };
+        let mut ws = current;
+        let name = unique_import_name(&ws, &fname);
         if let Ok(id) = ws.add_file(None, &name, text) {
             persist.run(ws);
             set_active_id.set(id);
@@ -500,29 +834,6 @@ async fn read_file_text(file: web_sys::File) -> Result<String, String> {
         .await
         .map_err(|_| "async read failed".to_string())
         .and_then(|v| v.as_string().ok_or_else(|| "empty".to_string()))
-}
-
-fn snippet_buttons(
-    set_content: WriteSignal<String>,
-    save: impl Fn(String) + Copy + 'static,
-) -> impl IntoView {
-    let add = move |snippet: &'static str| move |_| insert_snippet(set_content, save, snippet);
-    view! {
-        <button type="button" on:click=add("# Heading\n")>"Heading"</button>
-        <button type="button" on:click=add("**bold** ")>"Bold"</button>
-        <button type="button" on:click=add("*italic* ")>"Italic"</button>
-        <button type="button" on:click=add("`code` ")>"Code"</button>
-        <button type="button" on:click=add("- item\n")>"List"</button>
-        <button type="button" on:click=add("| H | V |\n|---|---|\n| | |\n")>"Table"</button>
-        <button type="button" on:click=add("||secret|| ")>"Spoiler"</button>
-    }
-}
-
-fn insert_snippet(set_content: WriteSignal<String>, save: impl Fn(String), snippet: &str) {
-    set_content.update(|c| {
-        c.push_str(snippet);
-        save(c.clone());
-    });
 }
 
 fn load_workspace() -> Workspace {

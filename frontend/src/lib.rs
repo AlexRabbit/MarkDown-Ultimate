@@ -1,4 +1,7 @@
 mod app;
+mod command_registry;
+mod editor_commands;
+mod tools_sidebar;
 
 use app::App;
 use leptos::mount::mount_to_body;
