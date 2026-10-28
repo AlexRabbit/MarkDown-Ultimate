@@ -4,7 +4,7 @@ Write-Host "Smoke check: $url"
 $r = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 60
 if ($r.StatusCode -ne 200) { throw "HTTP $($r.StatusCode)" }
 $body = $r.Content
-$needles = @("MarkDown Ultimate", "modeMarkdown", "btnToolsToggle", "view-pill")
+$needles = @("MarkDown Ultimate", "mdu-ui.js", "markdown_ultimate_frontend", "mduInitAppShortcuts")
 $missing = @()
 foreach ($n in $needles) {
   if ($body -notmatch [regex]::Escape($n)) { $missing += $n }
