@@ -1,0 +1,33 @@
+[workspace]
+resolver = "2"
+members = [
+    "code/config",
+    "code/diagnostics",
+    "modules/markdown_core",
+    "modules/workflow",
+    "modules/workspace",
+    "engine",
+    "frontend",
+]
+default-members = ["frontend"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["AlexRabbit"]
+repository = "https://github.com/AlexRabbit/MarkDown-Ultimate"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+uuid = { version = "1", features = ["v4", "serde", "js"] }
+chrono = { version = "0.4", features = ["serde"] }
+tracing = "0.1"
+anyhow = "1"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1

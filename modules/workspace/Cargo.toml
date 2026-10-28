@@ -1,0 +1,12 @@
+[package]
+name = "mu_workspace"
+description = "In-memory workspace tree (files, folders, ordering)"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }

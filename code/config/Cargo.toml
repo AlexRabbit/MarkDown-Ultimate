@@ -1,0 +1,11 @@
+[package]
+name = "mu_config"
+description = "Unified .env configuration for MarkDown Ultimate"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }

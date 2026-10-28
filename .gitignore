@@ -1,0 +1,12 @@
+/target/
+/dist/
+**/*.rs.bk
+.env
+/logs/hot/*.jsonl
+/logs/incidents/*
+**/logs/hot/*.jsonl
+!/logs/README.md
+.Didea/
+.vscode/
+*.pdb
+release/

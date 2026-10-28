@@ -1,0 +1,17 @@
+[package]
+name = "mu_workflow"
+description = "WorkFlow container import/export for MarkDown Ultimate"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+base64 = "0.22"
+
+[dev-dependencies]
+mu_workspace = { path = "../workspace" }
