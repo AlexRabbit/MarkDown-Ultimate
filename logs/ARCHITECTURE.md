@@ -2,7 +2,9 @@
 
 ## Scope
 
-This tranche implements schema v2 events, ring buffer (512), native JSONL under `LOGS_DIR/hot/events.jsonl`, WASM console mirroring, and an in-app **Diagnostics** modal (`recent_events`).
+This tranche implements schema v2 events, ring buffer (512), native JSONL under `LOGS_DIR/hot/events.jsonl`, WASM console mirroring, best-effort **PII redaction** on emit (`code/diagnostics/src/redact.rs`), and an in-app **Diagnostics** modal (`recent_events`).
+
+Local launcher uses `MDU_QUIET=1` → HTTP access lines go to `logs/hot/serve.log` instead of a extra console window.
 
 ## Layout
 

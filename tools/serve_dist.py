@@ -12,6 +12,8 @@ from urllib.parse import unquote, urlparse
 ROOT = Path(__file__).resolve().parent.parent / "dist"
 PREFIX = "/MarkDown-Ultimate"
 PORT = int(os.environ.get("MDU_PORT", "8765"))
+QUIET = os.environ.get("MDU_QUIET", "").strip() not in ("", "0", "false", "False")
+LOG_PATH = Path(__file__).resolve().parent.parent / "logs" / "hot" / "serve.log"
 
 
 class ReuseThreadingServer(ThreadingHTTPServer):
@@ -23,7 +25,16 @@ class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
     def log_message(self, fmt: str, *args) -> None:
-        sys.stderr.write(f"[mdu-serve] {fmt % args}\n")
+        line = f"[mdu-serve] {fmt % args}\n"
+        if QUIET:
+            try:
+                LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+                with LOG_PATH.open("a", encoding="utf-8") as f:
+                    f.write(line)
+            except OSError:
+                pass
+            return
+        sys.stderr.write(line)
 
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
@@ -84,7 +95,15 @@ def main() -> None:
     host = "127.0.0.1"
     httpd = ReuseThreadingServer((host, PORT), Handler)
     url = f"http://{host}:{PORT}{PREFIX}/"
-    sys.stderr.write(f"Serving {ROOT} at {url}\n")
+    banner = f"Serving {ROOT} at {url}\n"
+    if QUIET:
+        try:
+            LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+            LOG_PATH.write_text(banner, encoding="utf-8")
+        except OSError:
+            pass
+    else:
+        sys.stderr.write(banner)
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

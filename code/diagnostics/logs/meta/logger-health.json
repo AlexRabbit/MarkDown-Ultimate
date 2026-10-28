@@ -1,1 +1,1 @@
-{"dropped_events":0,"ring_capacity":512}
+{"dropped_events":0,"pii_redaction":"best_effort","ring_capacity":512,"schema_version":2}

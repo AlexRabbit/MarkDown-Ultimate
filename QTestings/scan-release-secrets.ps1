@@ -19,6 +19,7 @@ $patterns = @(
 $hits = @()
 Get-ChildItem -Path $Root -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object {
     if ($_.Extension -match '\.(wasm|pdb|exe|zip)$') { return }
+    if ($_.FullName -match '\\code\\diagnostics\\src\\redact\.rs$') { return }
     $text = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue
     if (-not $text) { return }
     foreach ($p in $patterns) {

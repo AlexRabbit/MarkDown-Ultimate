@@ -1,6 +1,9 @@
 //! Structured diagnostic events (JSONL) with correlation IDs.
 
+mod redact;
+
 use chrono::{DateTime, Utc};
+use redact::{redact_text, redact_value};
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::VecDeque;
@@ -99,6 +102,9 @@ pub fn emit_with_parent(
     operation_id: Option<String>,
     parent_event_id: Option<String>,
 ) {
+    let message = redact_text(&message.into());
+    let context = context.map(|v| redact_value(&v));
+    let error = error.map(|v| redact_value(&v));
     let ev = DiagnosticEvent {
         schema_version: 2,
         event_id: Uuid::new_v4().to_string(),
@@ -110,7 +116,7 @@ pub fn emit_with_parent(
         category: category.into(),
         event_type: event_type.into(),
         component: component.into(),
-        message: message.into(),
+        message,
         context,
         error,
     };
@@ -157,8 +163,10 @@ fn persist_line(line: &str) {
             let _ = create_dir_all(parent);
         }
         let health = serde_json::json!({
+            "schema_version": 2,
             "dropped_events": dropped_events(),
             "ring_capacity": RING_CAP,
+            "pii_redaction": "best_effort",
         });
         let _ = std::fs::write(meta_path, health.to_string());
     }

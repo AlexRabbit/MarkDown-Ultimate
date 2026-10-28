@@ -38,7 +38,7 @@
 
 ## What this app is
 
-MarkDown Ultimate is a **browser-based Markdown workspace**: multiple files and folders, live preview, export, and optional local API engine. Documents are stored in **browser local storage** unless you use the optional Axum engine.
+MarkDown Ultimate is a **browser-based Markdown workspace**: multiple files and folders, live preview, export, and optional local API engine. Documents are stored in **browser local storage** unless you use the optional Actix engine.
 
 Built with **Rust + Leptos (WASM)** for the UI and shared **markdown_core** for rendering (CommonMark/GFM-style features, KaTeX math, spoilers, etc.).
 
@@ -134,7 +134,7 @@ Output upload snapshot: `release\MarkDown-Ultimate\` (gitignored staging folder 
 | --- | --- |
 | `frontend/` | Leptos WASM UI, styles, tour, tools sidebar |
 | `modules/` | Workspace tree, markdown core, workflow import/export |
-| `engine/` | Optional Axum HTTP API + static `dist/` |
+| `engine/` | Optional Actix HTTP API + static `dist/` |
 | `code/` | Shared config and diagnostics |
 | `system/` | Docker compose for local databases |
 | `tools/` | Local server + launcher helpers |

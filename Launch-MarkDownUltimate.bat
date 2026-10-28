@@ -23,20 +23,41 @@ if not exist "dist\index.html" (
   exit /b 1
 )
 
+if not exist "dist\js\mdu-ui.js" (
+  if not exist "dist\js" mkdir "dist\js"
+  copy /Y "%~dp0frontend\js\mdu-ui.js" "%~dp0dist\js\mdu-ui.js" >nul 2>&1
+)
+
 if "%MDU_PORT%"=="" set "MDU_PORT=8765"
 
 for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":%MDU_PORT% " ^| findstr LISTENING') do (
   taskkill /F /PID %%a >nul 2>&1
 )
 
+where pythonw >nul 2>&1
+if %errorlevel%==0 (
+  set "PYEXE=pythonw"
+  set "PYARG="
+  goto :start_server
+)
 where python >nul 2>&1
 if %errorlevel%==0 (
   set "PYEXE=python"
   set "PYARG="
   goto :start_server
 )
+if exist "%~dp0portable\MarkDown-Ultimate-Portable\python\pythonw.exe" (
+  set "PYEXE=%~dp0portable\MarkDown-Ultimate-Portable\python\pythonw.exe"
+  set "PYARG="
+  goto :start_server
+)
 if exist "%~dp0portable\MarkDown-Ultimate-Portable\python\python.exe" (
   set "PYEXE=%~dp0portable\MarkDown-Ultimate-Portable\python\python.exe"
+  set "PYARG="
+  goto :start_server
+)
+if exist "%~dp0python\pythonw.exe" (
+  set "PYEXE=%~dp0python\pythonw.exe"
   set "PYARG="
   goto :start_server
 )
@@ -58,6 +79,7 @@ exit /b 1
 
 :start_server
 echo Starting local web server - do not open index.html as a file.
+set "MDU_QUIET=1"
 set "MDU_PORT=%MDU_PORT%"
 start "" /B %PYEXE% %PYARG% "%~dp0tools\serve_dist.py"
 timeout /t 3 /nobreak >nul

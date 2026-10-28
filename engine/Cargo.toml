@@ -9,8 +9,8 @@ name = "markdown_ultimate_engine"
 path = "src/main.rs"
 
 [dependencies]
-axum = "0.8"
-tower-http = { version = "0.6", features = ["fs"] }
+actix-web = "4"
+actix-files = "0.6"
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net"] }
