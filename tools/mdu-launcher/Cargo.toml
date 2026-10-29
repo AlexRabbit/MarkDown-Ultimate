@@ -9,7 +9,7 @@ license = "MIT"
 description = "Portable Windows app — local server + native webview (no browser, no console)"
 
 [[bin]]
-name = "MarkDown-Ultimate-Portable"
+name = "MarkDownUltimate"
 path = "src/main.rs"
 
 [dependencies]

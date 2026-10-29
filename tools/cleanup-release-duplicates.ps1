@@ -1,12 +1,18 @@
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
-$stale = Join-Path $root "release\MarkDown-Ultimate"
-$portable = Join-Path $root "portable"
-foreach ($p in @($stale, $portable)) {
+$remove = @(
+    (Join-Path $root "release\MarkDown-Ultimate"),
+    (Join-Path $root "portable"),
+    (Join-Path $root "release\artifacts\MarkDown-Ultimate-Portable"),
+    (Join-Path $root "release\artifacts\MarkDown-Ultimate-Portable.exe"),
+    (Join-Path $root "release\artifacts\MarkDown-Ultimate-Portable.zip")
+)
+foreach ($p in $remove) {
     if (Test-Path $p) {
-        Remove-Item -Recurse -Force $p
-        Write-Host "Removed duplicate tree: $p"
+        Remove-Item -Recurse -Force $p -ErrorAction SilentlyContinue
+        Write-Host "Removed stale duplicate: $p"
     }
 }
-Write-Host "Canonical project root only: $root"
-Write-Host "Release assets only: $(Join-Path $root 'release\artifacts')"
+Write-Host "Dev repo (source): $root"
+Write-Host "Portable app (only copy to run): $(if ($env:MDU_PORTABLE_ROOT) { $env:MDU_PORTABLE_ROOT } else { 'A:\VibeCode\MarkDown-Ultimate' })"
+Write-Host "GitHub staging only: $(Join-Path $root 'release\artifacts') (exe + zip + apk, not a full tree)"

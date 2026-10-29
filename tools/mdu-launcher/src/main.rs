@@ -39,13 +39,13 @@ fn run() -> Result<(), String> {
 
     start_server(&root, &port)?;
 
-    for attempt in 0..20 {
+    for attempt in 0..40 {
         thread::sleep(Duration::from_millis(250));
-        if url_reachable(&url) {
+        if port_open(&port) {
             break;
         }
-        if attempt == 19 {
-            return Err(format!("Server did not respond at {url}"));
+        if attempt == 39 {
+            return Err(format!("Server did not listen on port {port}"));
         }
     }
 
@@ -73,23 +73,13 @@ fn run() -> Result<(), String> {
     });
 }
 
-fn url_reachable(url: &str) -> bool {
-    Command::new("powershell")
-        .args([
-            "-NoProfile",
-            "-Command",
-            &format!(
-                "try {{ (Invoke-WebRequest -Uri '{}' -UseBasicParsing -TimeoutSec 2).StatusCode -eq 200 }} catch {{ $false }}",
-                url
-            ),
-        ])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .output()
-        .ok()
-        .and_then(|o| String::from_utf8(o.stdout).ok())
-        .map(|s| s.trim() == "True")
-        .unwrap_or(false)
+fn port_open(port: &str) -> bool {
+    use std::net::{SocketAddr, TcpStream};
+    let addr: SocketAddr = match format!("127.0.0.1:{port}").parse() {
+        Ok(a) => a,
+        Err(_) => return false,
+    };
+    TcpStream::connect_timeout(&addr, Duration::from_secs(1)).is_ok()
 }
 
 fn start_server(root: &Path, port: &str) -> Result<(), String> {

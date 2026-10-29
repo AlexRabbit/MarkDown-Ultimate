@@ -1,29 +1,34 @@
-# Distribution layout (read this once)
+# Distribution — one portable folder only
 
-## One project — one folder
+| What | Path |
+|------|------|
+| **Source / dev** | `A:\VibeCode\MarkDown Ultimate\` — edit code, run `Launch-MarkDownUltimate.bat` (browser + local server) |
+| **Portable Windows app** | `A:\VibeCode\MarkDown-Ultimate\` — double-click **`MarkDownUltimate.exe`** (native window, no extra CMD, no external browser) |
+| **GitHub Releases upload** | `release\artifacts\` — only **`MarkDownUltimate.exe`**, **`MarkDownUltimate-Portable.zip`**, **`MarkDown-Ultimate.apk`** (staging, gitignored) |
 
-**Edit and run only here:**
+We **do not** create `release\MarkDown-Ultimate\` or nested `MarkDown-Ultimate-Portable\` copies anymore.  
+Run `tools\cleanup-release-duplicates.ps1` if old duplicates remain.
 
-`A:\VibeCode\MarkDown Ultimate\`
-
-That is the git repo root (`Launch-MarkDownUltimate.bat`, `dist/`, `frontend/`, etc.).
-
-We **do not** maintain a second full copy at `release\MarkDown-Ultimate\`. If you see that folder, delete it and run:
+## Build portable + staging assets
 
 ```powershell
-.\tools\cleanup-release-duplicates.ps1
+cd "A:\VibeCode\MarkDown Ultimate"
+.\tools\portable-bundle.ps1
 ```
 
-## GitHub Releases assets only
+## GitHub Release
 
-Build outputs go to **`release\artifacts\`** (gitignored):
+```powershell
+& "${env:ProgramFiles}\GitHub CLI\gh.exe" auth login
+.\QTestings\create-github-release.ps1 -Tag v0.2.3
+```
 
-- `MarkDown-Ultimate-Portable.exe` — native window (WebView2), not an external browser
-- `MarkDown-Ultimate-Portable.zip` — same app + embedded Python + `dist/`
-- `MarkDown-Ultimate.apk` — when Android SDK + `dx` are installed
+## Android APK
 
-Upload those files to [GitHub Releases](https://github.com/AlexRabbit/MarkDown-Ultimate/releases).
+Requires Android Studio SDK + `cargo install dioxus-cli`, then:
 
-## Not the same as the repo name on disk
+```powershell
+.\QTestings\build-android.ps1
+```
 
-The folder is `MarkDown Ultimate` (space) on your PC. GitHub repo is `MarkDown-Ultimate` (hyphen). That is normal — do not clone a third copy under `A:\VibeCode\MarkDown-Ultimate` unless you intentionally want a separate clone.
+Output: `release\artifacts\MarkDown-Ultimate.apk`

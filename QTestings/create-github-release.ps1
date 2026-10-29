@@ -28,20 +28,10 @@ if (-not $gh) {
 }
 
 $assets = @(
-    (Join-Path $artifacts "MarkDown-Ultimate-Portable.exe"),
-    (Join-Path $artifacts "MarkDown-Ultimate-Portable.zip"),
+    (Join-Path $artifacts "MarkDownUltimate.exe"),
+    (Join-Path $artifacts "MarkDownUltimate-Portable.zip"),
     (Join-Path $artifacts "MarkDown-Ultimate.apk")
 ) | Where-Object { Test-Path $_ }
-
-if ($assets.Count -eq 0) {
-    $portableExe = Join-Path $artifacts "MarkDown-Ultimate-Portable\MarkDown-Ultimate-Portable.exe"
-    $portableZip = Join-Path $artifacts "MarkDown-Ultimate-Portable.zip"
-    if (Test-Path $portableExe) {
-        Copy-Item -Force $portableExe (Join-Path $artifacts "MarkDown-Ultimate-Portable.exe")
-        $assets += (Join-Path $artifacts "MarkDown-Ultimate-Portable.exe")
-    }
-    if (Test-Path $portableZip) { $assets += $portableZip }
-}
 
 if ($assets.Count -eq 0) {
     throw "No release assets in $artifacts - run prepare-release.ps1 first"

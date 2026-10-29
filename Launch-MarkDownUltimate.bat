@@ -46,26 +46,6 @@ if %errorlevel%==0 (
   set "PYARG="
   goto :start_server
 )
-if exist "%~dp0release\artifacts\MarkDown-Ultimate-Portable\python\pythonw.exe" (
-  set "PYEXE=%~dp0release\artifacts\MarkDown-Ultimate-Portable\python\pythonw.exe"
-  set "PYARG="
-  goto :start_server
-)
-if exist "%~dp0release\artifacts\MarkDown-Ultimate-Portable\python\python.exe" (
-  set "PYEXE=%~dp0release\artifacts\MarkDown-Ultimate-Portable\python\python.exe"
-  set "PYARG="
-  goto :start_server
-)
-if exist "%~dp0portable\MarkDown-Ultimate-Portable\python\pythonw.exe" (
-  set "PYEXE=%~dp0portable\MarkDown-Ultimate-Portable\python\pythonw.exe"
-  set "PYARG="
-  goto :start_server
-)
-if exist "%~dp0portable\MarkDown-Ultimate-Portable\python\python.exe" (
-  set "PYEXE=%~dp0portable\MarkDown-Ultimate-Portable\python\python.exe"
-  set "PYARG="
-  goto :start_server
-)
 if exist "%~dp0python\pythonw.exe" (
   set "PYEXE=%~dp0python\pythonw.exe"
   set "PYARG="
