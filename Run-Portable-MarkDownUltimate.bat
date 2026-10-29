@@ -1,12 +1,11 @@
 @echo off
 setlocal
-set "PORTABLE=%~dp0..\MarkDown-Ultimate\MarkDownUltimate.exe"
-if exist "%PORTABLE%" (
-  start "" "%PORTABLE%"
+cd /d "%~dp0"
+if exist "%~dp0MarkDownUltimate.exe" (
+  start "" "%~dp0MarkDownUltimate.exe"
   exit /b 0
 )
-echo Portable app not built yet.
-echo From the dev repo run: tools\portable-bundle.ps1
-echo Then run: %PORTABLE%
+echo MarkDownUltimate.exe is not built yet.
+echo Run: powershell -File tools\portable-bundle.ps1
 pause
 exit /b 1

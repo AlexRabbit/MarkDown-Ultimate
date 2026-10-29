@@ -13,6 +13,13 @@ foreach ($p in $remove) {
         Write-Host "Removed stale duplicate: $p"
     }
 }
-Write-Host "Dev repo (source): $root"
-Write-Host "Portable app (only copy to run): $(if ($env:MDU_PORTABLE_ROOT) { $env:MDU_PORTABLE_ROOT } else { Join-Path (Split-Path $root -Parent) 'MarkDown-Ultimate' })"
-Write-Host "GitHub staging only: $(Join-Path $root 'release\artifacts') (exe + zip + apk, not a full tree)"
+
+# Legacy second folder (hyphen name next to repo) — no longer used.
+$legacySibling = Join-Path (Split-Path $root -Parent) "MarkDown-Ultimate"
+if ((Test-Path $legacySibling) -and ($legacySibling -ne $root)) {
+    Write-Host "Removing legacy duplicate folder: $legacySibling"
+    Remove-Item -Recurse -Force $legacySibling -ErrorAction SilentlyContinue
+}
+
+Write-Host "Project folder (everything lives here): $root"
+Write-Host "Release file copies: $(Join-Path $root 'release\artifacts')"

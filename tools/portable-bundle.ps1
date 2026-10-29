@@ -2,12 +2,8 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
 & (Join-Path $root "tools\cleanup-release-duplicates.ps1")
 
-# ONE portable install folder (not nested under release/, not a second copy of the repo).
-$portableRoot = if ($env:MDU_PORTABLE_ROOT) {
-    $env:MDU_PORTABLE_ROOT
-} else {
-    Join-Path (Split-Path $root -Parent) "MarkDown-Ultimate"
-}
+# Single install folder = repo root (no sibling copy).
+$portableRoot = if ($env:MDU_PORTABLE_ROOT) { $env:MDU_PORTABLE_ROOT } else { $root }
 $artifacts = Join-Path $root "release\artifacts"
 $pyDir = Join-Path $portableRoot "python"
 
@@ -22,19 +18,12 @@ if (-not (Test-Path (Join-Path $root "dist\js\mdu-ui.js"))) {
     Copy-Item -Force (Join-Path $root "frontend\js\mdu-ui.js") (Join-Path $root "dist\js\mdu-ui.js")
 }
 
-New-Item -ItemType Directory -Path $portableRoot -Force | Out-Null
 New-Item -ItemType Directory -Path $artifacts -Force | Out-Null
-
-# Sync runtime files into the single portable root (update in place).
-Copy-Item -Recurse -Force (Join-Path $root "dist") (Join-Path $portableRoot "dist")
-New-Item -ItemType Directory -Force -Path (Join-Path $portableRoot "tools") | Out-Null
-Copy-Item -Force (Join-Path $root "tools\serve_dist.py") (Join-Path $portableRoot "tools\serve_dist.py")
-Copy-Item -Force (Join-Path $root "README.md") $portableRoot -ErrorAction SilentlyContinue
 
 if (-not (Test-Path (Join-Path $pyDir "python.exe"))) {
     $embedUrl = "https://www.python.org/ftp/python/3.12.7/python-3.12.7-embed-amd64.zip"
     $zipPath = Join-Path $env:TEMP "mdu-python-embed-amd64.zip"
-    Write-Host "Downloading embeddable Python (once)..."
+    Write-Host "Downloading embeddable Python (once) into project folder..."
     Invoke-WebRequest -Uri $embedUrl -OutFile $zipPath -UseBasicParsing
     New-Item -ItemType Directory -Force -Path $pyDir | Out-Null
     Expand-Archive -Path $zipPath -DestinationPath $pyDir -Force
@@ -48,7 +37,7 @@ if (-not (Test-Path (Join-Path $pyDir "python.exe"))) {
     }
 }
 
-Write-Host "Building MarkDownUltimate.exe (native window, no browser, no console)..."
+Write-Host "Building MarkDownUltimate.exe..."
 Push-Location (Join-Path $root "tools\mdu-launcher")
 cargo build --release
 Pop-Location
@@ -62,11 +51,20 @@ Copy-Item -Force $builtExe (Join-Path $artifacts "MarkDownUltimate.exe")
 
 $zipPath = Join-Path $artifacts "MarkDownUltimate-Portable.zip"
 if (Test-Path $zipPath) { Remove-Item -Force $zipPath }
-Compress-Archive -Path (Join-Path $portableRoot "*") -DestinationPath $zipPath -Force
+$zipStage = Join-Path $env:TEMP "mdu-portable-zip-$(Get-Random)"
+New-Item -ItemType Directory -Force -Path $zipStage | Out-Null
+Copy-Item -Recurse -Force (Join-Path $portableRoot "dist") (Join-Path $zipStage "dist")
+Copy-Item -Recurse -Force $pyDir (Join-Path $zipStage "python")
+New-Item -ItemType Directory -Force -Path (Join-Path $zipStage "tools") | Out-Null
+Copy-Item -Force (Join-Path $root "tools\serve_dist.py") (Join-Path $zipStage "tools\serve_dist.py")
+Copy-Item -Force $builtExe (Join-Path $zipStage "MarkDownUltimate.exe")
+Compress-Archive -Path (Join-Path $zipStage "*") -DestinationPath $zipPath -Force
+Remove-Item -Recurse -Force $zipStage
 
 Write-Host ""
-Write-Host "Single portable install (run this):"
+Write-Host "One folder - run the app here:"
 Write-Host "  $portableRoot\MarkDownUltimate.exe"
-Write-Host "GitHub upload copies:"
+Write-Host "Release uploads (GitHub):"
 Write-Host "  $artifacts\MarkDownUltimate.exe"
+Write-Host "  $artifacts\MarkDown-Ultimate.apk"
 Write-Host "  $zipPath"

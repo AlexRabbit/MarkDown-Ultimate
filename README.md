@@ -1,173 +1,110 @@
-# MarkDown Ultimate
+<p align="center">
+  <strong style="font-size: 1.5em;">MarkDown Ultimate</strong><br/>
+  <em>Your notes, folders, and preview — in one calm place.</em>
+</p>
 
-**Author:** [AlexRabbit](https://github.com/AlexRabbit)  
-**License:** MIT  
-**Live app:** [https://alexrabbit.github.io/MarkDown-Ultimate/](https://alexrabbit.github.io/MarkDown-Ultimate/)
+<p align="center">
+  <a href="https://alexrabbit.github.io/MarkDown-Ultimate/"><strong>Open the app online</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/AlexRabbit/MarkDown-Ultimate/releases">Download for Windows & Android</a>
+</p>
 
 ---
 
-## Quick start (Windows)
+## What it is
 
-1. **Download or clone** this repository to a folder on your PC.
-2. **Double-click** `Launch-MarkDownUltimate.bat` at the **root** of the project (same folder as this README).
-3. Wait a few seconds. Your default browser should open:
-   **`http://127.0.0.1:8765/MarkDown-Ultimate/`**
-4. You should see the MarkDown Ultimate header (**Create**, **Open**, **Save**, **How to Use**) and the file sidebar on the left.
+**MarkDown Ultimate** is a writing app for Markdown: the plain, readable format used for notes, docs, and README files. You work in your browser or in a small desktop window — no account required for the online version.
 
-### What success looks like
+---
 
-| Signal | Meaning |
+## What it does
+
+You keep **many notes at once**, organized in **folders**, with a **live preview** of how they will look when shared or printed. You can export a single note, save your whole workspace as a backup, or print to PDF from the preview.
+
+Everything feels like one desk: files on the left, writing in the middle, optional tools on the right.
+
+---
+
+## Features and layout
+
+| Area | What you get |
 | --- | --- |
-| Browser shows the editor UI | Local server and WASM app loaded correctly |
-| URL starts with `http://127.0.0.1:8765` | Correct (not `file://`) |
-| First launch may take longer | Trunk builds `dist/` if missing (Rust toolchain required) |
+| **Left — Files** | Folder tree, scroll when you have lots of notes. **📄** creates a new note; **+** creates a new folder. Use **⋮** on a file or folder to rename or remove. Drag items to reorder or nest. |
+| **Center — Editor** | Write Markdown with a **Markdown / Both / Preview** switch at the top. Preview shows headings, lists, tables, math, and more. |
+| **Right — Tools** (optional) | Open **⟨ Tools** for formatting shortcuts, find/replace, and a shortcut cheat sheet. |
+| **Below the tree — Outline** | Click a heading to jump in the long notes. |
+| **Top bar** | **Open** and **Save** for files and full-workspace backups; **How to Use** starts a guided tour when *you* choose. |
+| **Bottom** | Word and character counts. |
 
-### If startup fails
+**Helpful extras:** PDF via your browser’s print dialog, diagnostics copy for support, and a guided tour that never pops up on its own.
 
-| Problem | What to do |
+---
+
+## Use it online (nothing to install)
+
+Open this link in Chrome, Edge, or Firefox:
+
+### [https://alexrabbit.github.io/MarkDown-Ultimate/](https://alexrabbit.github.io/MarkDown-Ultimate/)
+
+Your notes stay in **this browser** unless you export them. Bookmark the link for quick access.
+
+---
+
+## Download — Windows app, Android app, and zip
+
+Official builds are published on **GitHub Releases** (free downloads):
+
+| What | Where to get it |
 | --- | --- |
-| Blank page / broken layout | Do **not** open `dist\index.html` directly. Always use the `.bat` launcher or the URL above. |
-| `Python is required` | Install [Python 3](https://www.python.org/downloads/) and ensure `python` or `py` is on PATH. |
-| `dist/index.html missing` | Install [Rust](https://rustup.rs/) and [Trunk](https://trunkrs.dev/), then run `trunk build --release` inside `frontend/`. |
-| Trunk build fails on Windows | Install Visual Studio Build Tools (C++ workload) or run the `.bat` once (it tries to load vcvars). |
-| Port 8765 in use | Set environment variable `MDU_PORT=8770`, then launch again. |
-| PDF export empty | Allow pop-ups for `127.0.0.1`; PDF uses the browser print dialog on rendered content. |
-| Windows SmartScreen / "Unknown publisher" | The `.bat` is an unsigned script from this repo. Click **More info → Run anyway**, or run from a zip you trust. Signing requires a code-signing certificate (not included). |
+| **Windows app** (`MarkDownUltimate.exe`) | [Latest release → MarkDownUltimate.exe](https://github.com/AlexRabbit/MarkDown-Ultimate/releases/latest/download/MarkDownUltimate.exe) |
+| **Android app** (`MarkDown-Ultimate.apk`) | [Latest release → MarkDown-Ultimate.apk](https://github.com/AlexRabbit/MarkDown-Ultimate/releases/latest/download/MarkDown-Ultimate.apk) |
+| **Portable zip** (folder you can unzip anywhere) | [Latest release → MarkDownUltimate-Portable.zip](https://github.com/AlexRabbit/MarkDown-Ultimate/releases/latest/download/MarkDownUltimate-Portable.zip) |
 
----
+If a link says “Not Found,” open the [Releases page](https://github.com/AlexRabbit/MarkDown-Ultimate/releases) and pick the newest **v** tag — assets are attached there.
 
-## What this app is
+### After you clone or download this project
 
-MarkDown Ultimate is a **browser-based Markdown workspace**: multiple files and folders, live preview, export, and optional local API engine. Documents are stored in **browser local storage** unless you use the optional Actix engine.
+Everything is meant to live in **one project folder** (this repository). When you build locally:
 
-Built with **Rust + Leptos (WASM)** for the UI and shared **markdown_core** for rendering (CommonMark/GFM-style features, KaTeX math, spoilers, etc.).
-
----
-
-## Main features
-
-| Feature | How to use |
+| File | Location in your project |
 | --- | --- |
-| **View modes** | Top pill: **Markdown** / **Both** / **Preview** — all modes stay editable. |
-| **Sidebar** | **+** new folders (unique names); **▼/▶** expand/collapse; **⋮** on files and folders (rename/delete); drag to reorder/nest; scroll the file list and outline. |
-| **Tools panel** | **⟨ Tools** on the right — command registry (bold, H1–H6, tables, footnotes, callouts); drag the left edge to resize. |
-| **Outline** | Heading list under the file tree; click to jump in the editor. |
-| **Find / replace** | Tools → Find and replace, or **Ctrl+F**. |
-| **Shortcuts** | Tools → Keyboard shortcuts, or **Ctrl+/**. |
-| **Stats** | Word and character count in the status bar under the editor. |
-| **Create** | New untitled `.md` in the workspace. |
-| **Open** | Import `.md` (merges into workspace) or **WorkFlow** `.mdu.json` (full backup). |
-| **Save** | Export current file as `.md`, **PDF** (print dialog), or **WorkFlow** container (all files + settings). |
-| **How to Use** | Guided tour (never auto-starts). |
-| **Diagnostics** | Recent in-app events + export. |
+| **Windows `.exe`** | `MarkDownUltimate.exe` in the **root** of this folder (created by `tools\portable-bundle.ps1`) |
+| **Android `.apk`** (build output) | `release\artifacts\MarkDown-Ultimate.apk` |
+| **Copies ready for GitHub upload** | `release\artifacts\` (exe, zip, apk) |
 
 ---
 
-## Online use (no install)
+## What the `.bat` files do (Windows)
 
-Open the GitHub Pages build (same UI, no local Python server):
-
-**[https://alexrabbit.github.io/MarkDown-Ultimate/](https://alexrabbit.github.io/MarkDown-Ultimate/)**
-
-The GitHub **repository** page is source only; the editor runs on **Pages** at the link above.
-
----
-
-## Prerequisites
-
-| Component | Required for | Install |
-| --- | --- | --- |
-| **Windows 10/11** | `.bat` launcher | — |
-| **Python 3** | Local static server | python.org |
-| **Rust + wasm32 target** | Rebuild frontend | rustup + `rustup target add wasm32-unknown-unknown` |
-| **Trunk** | `dist/` build | `cargo install trunk` |
-| **Docker** (optional) | Aerospike/NATS stack | Docker Desktop |
-| **Node** (optional) | CI only | For GitHub Actions if you fork |
-
----
-
-## Configuration
-
-Copy `.env.example` to `.env` for the **optional engine** (not required for the browser app):
-
-```env
-ENGINE_BIND=127.0.0.1:8080
-```
-
-Never commit `.env` — it is listed in `.gitignore`.
-
----
-
-## Optional local engine
-
-```powershell
-docker compose -f system/docker-compose.yml up -d
-cargo run -p markdown_ultimate_engine
-```
-
-Engine serves `dist/` and workspace API on the bind address from `.env`.
-
----
-
-## Development and tests
-
-```powershell
-cd frontend
-trunk serve
-
-.\QTestings\run-all.ps1
-
-.\QTestings\prepare-release.ps1
-```
-
-**Distribution:** develop in **repo root**; ship downloads via **[GitHub Releases](https://github.com/AlexRabbit/MarkDown-Ultimate/releases)** and **[GitHub Pages](https://alexrabbit.github.io/MarkDown-Ultimate/)**. Build outputs go to gitignored `release\artifacts\` only (not a nested full project copy).
-
-**Portable Windows:** `powershell -File tools\portable-bundle.ps1` or `prepare-release.ps1` → `release\artifacts\MarkDown-Ultimate-Portable.exe` (+ zip). Details: `release\UPLOAD_NOTES.md`.
-
-**Android:** `apps/` Dioxus scaffold — APK when SDK/`dx` are configured (`QTestings\build-android.ps1`).
-
----
-
-## Project layout
-
-| Path | Purpose |
+| File | What happens when you double‑click |
 | --- | --- |
-| `frontend/` | Leptos WASM UI, styles, tour, tools sidebar |
-| `modules/` | Workspace tree, markdown core, workflow import/export |
-| `engine/` | Optional Actix HTTP API + static `dist/` |
-| `code/` | Shared config and diagnostics |
-| `system/` | Docker compose for local databases |
-| `tools/` | Local server + launcher helpers |
-| `QTestings/` | Tests and release prep scripts |
-| `dist/` | Built static site (generated) |
+| **`Launch-MarkDownUltimate.bat`** | Starts a tiny local server and opens the app in your **default browser** at `http://127.0.0.1:8765/MarkDown-Ultimate/`. Leave the window open while you write. Best for development or if you prefer a browser tab. |
+| **`Run-Portable-MarkDownUltimate.bat`** | Starts **`MarkDownUltimate.exe`** in the same folder — a **desktop window** with the app inside (no separate browser tab). Run `tools\portable-bundle.ps1` first if the exe is missing. |
 
 ---
 
-## Troubleshooting logs
+## One folder — not two
 
-| Location | Content |
-| --- | --- |
-| In-app **Diagnostics** | Structured frontend events |
-| `logs/` | Project log layout (see `logs/README.md`) |
-| Browser devtools console | WASM/JS errors |
+You should only need **this repository folder** (for example `MarkDown Ultimate` on your PC).
+
+An older setup copied a second folder with a similar name (`MarkDown-Ultimate` next to this one). That duplicate is **removed** when you run `tools\portable-bundle.ps1` or `tools\cleanup-release-duplicates.ps1`. The app, `dist`, optional embedded Python, and `MarkDownUltimate.exe` all update **here**.
 
 ---
 
-## Security
+## Publish your own copy online (light overview)
 
-- No secrets belong in the repo; use `.env.example` templates only.
-- See `release/SECURITY_CHECK.md` after running `prepare-release.ps1`.
+If you fork this project on GitHub:
 
----
+1. Push your changes to the **`main`** branch.
+2. Turn on **GitHub Pages** for the repo (Settings → Pages → deploy from **GitHub Actions**).
+3. The workflow **Deploy GitHub Pages** builds the site; after a few minutes your fork gets a URL like `https://<your-user>.github.io/MarkDown-Ultimate/`.
 
-## License and credits
-
-**MIT License** — Copyright (c) AlexRabbit
-
-Third-party assets (KaTeX, Driver.js, etc.) remain under their respective licenses in the frontend build.
+To share **exe / apk** files, attach them to a **Release** on GitHub (Releases → Draft a new release → upload the files from `release\artifacts\`). You do not commit those large binaries into git.
 
 ---
 
-## Maintainer
+## License
 
-**AlexRabbit** — [GitHub](https://github.com/AlexRabbit/MarkDown-Ultimate)
+MIT — [AlexRabbit](https://github.com/AlexRabbit)
+
+<p align="center"><sub>Made for people who like clear notes and simple tools.</sub></p>

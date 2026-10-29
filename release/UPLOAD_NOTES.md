@@ -1,21 +1,17 @@
-# Distribution — one portable folder only
+# Distribution — one project folder
 
 | What | Path |
 |------|------|
-| **Source / dev** | Your git clone (repo root) — `Launch-MarkDownUltimate.bat` opens the browser + local server |
-| **Portable Windows app** | Sibling folder **`MarkDown-Ultimate`** next to the repo (created by `portable-bundle.ps1`) — run **`MarkDownUltimate.exe`** |
-| **GitHub Releases** | `release/artifacts/` — `MarkDownUltimate.exe`, zip, APK (gitignored staging) |
+| **Your project** | This git clone — one folder only |
+| **Run in browser** | `Launch-MarkDownUltimate.bat` |
+| **Run desktop window** | `MarkDownUltimate.exe` or `Run-Portable-MarkDownUltimate.bat` |
+| **GitHub upload staging** | `release\artifacts\` (exe, zip, apk — not committed to git) |
 
-Set **`MDU_PORTABLE_ROOT`** to override the portable install folder.
+Legacy sibling folder `MarkDown-Ultimate` beside the repo is deleted by `tools\cleanup-release-duplicates.ps1`.
 
-We do **not** ship a second full copy of the repo under `release/MarkDown-Ultimate/`.
-
-## Build
+## Build downloads locally
 
 ```powershell
-cd frontend
-trunk build --release
-cd ..
 .\tools\portable-bundle.ps1
 .\QTestings\build-android.ps1
 ```
@@ -26,7 +22,5 @@ cd ..
 .\QTestings\scan-repo-before-push.ps1
 git push origin main
 gh auth login
-.\QTestings\create-github-release.ps1 -Tag v0.2.4
+.\QTestings\create-github-release.ps1 -Tag v0.2.5
 ```
-
-Do **not** run `MarkDownUltimate.exe` from the dev repo root unless `dist/` and `python/` sit beside that exe (use the portable folder instead).
