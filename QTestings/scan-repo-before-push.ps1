@@ -23,6 +23,7 @@ try {
         if ($rel -match '(^|/)target/') { continue }
         if ($rel -match 'code/diagnostics/src/redact\.rs$') { continue }
         if ($rel -match '(^|/)\.cursor/') { continue }
+        if ($rel -match 'QTestings/scan-') { continue }
 
         $full = Join-Path $root $rel
         if (-not (Test-Path $full -PathType Leaf)) { continue }

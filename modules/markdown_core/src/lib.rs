@@ -1,7 +1,7 @@
 //! Markdown → safe HTML with GFM (tables, tasks, strikethrough) and Telegram-rich extensions.
 
 use ammonia::Builder;
-use comrak::{markdown_to_html, ComrakOptions};
+use comrak::{markdown_to_html, Options};
 use regex::Regex;
 use std::sync::LazyLock;
 
@@ -10,15 +10,14 @@ static SPOILER: LazyLock<Regex> =
 
 pub fn render_markdown(source: &str) -> String {
     let pre = preprocess_telegram_extensions(source);
-    let mut opts = ComrakOptions::default();
+    let mut opts = Options::default();
     opts.extension.table = true;
     opts.extension.tasklist = true;
     opts.extension.strikethrough = true;
     opts.extension.autolink = true;
-    opts.extension.tagfilter = false;
     opts.extension.superscript = true;
     opts.extension.footnotes = true;
-    opts.render.unsafe_ = true;
+    opts.render.r#unsafe = true;
     opts.render.github_pre_lang = true;
 
     let html = markdown_to_html(&pre, &opts);

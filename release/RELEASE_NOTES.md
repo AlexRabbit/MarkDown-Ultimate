@@ -1,3 +1,7 @@
+## v0.2.5
+
+- **Dependabot:** bump `base64` 0.23, `comrak` 0.58, `gloo-storage` 0.4, `leptos` 0.8 (comrak `Options` API)
+
 ## v0.2.4
 
 - **CI:** Actix 3.20 still pulls vulnerable `h2` 0.3.x in the lockfile; engine stays on **Axum** so `cargo audit` passes

@@ -6,7 +6,7 @@ edition.workspace = true
 authors.workspace = true
 
 [dependencies]
-comrak = { version = "0.33", default-features = false, features = ["shortcodes"] }
+comrak = { version = "0.58", default-features = false, features = ["shortcodes"] }
 regex = "1"
 ammonia = "4"
 
