@@ -32,6 +32,8 @@ jobs:
           touch dist/.nojekyll
           test -f dist/index.html
           test -f dist/js/mdu-ui.js
+          grep -q sidebar-tree-scroll dist/*.css dist/**/*.css 2>/dev/null || grep -rq sidebar-tree-scroll dist/
+          grep -q icon-sm dist/*.css dist/**/*.css 2>/dev/null || grep -rq icon-sm dist/
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:

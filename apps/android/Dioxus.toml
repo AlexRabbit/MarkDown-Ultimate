@@ -10,5 +10,5 @@ package = "com.alexrabbit.markdownultimate"
 version_name = "0.2.4"
 version_code = 204
 
-[android.permissions]
-INTERNET = true
+[android.permissions.INTERNET]
+description = "Load the MarkDown Ultimate web app from GitHub Pages"

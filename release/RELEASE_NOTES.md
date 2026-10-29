@@ -1,7 +1,7 @@
 ## v0.2.4
 
-- **CI:** Engine back on Axum — `cargo audit` passes (no `h2` 0.3.x via Actix)
-- **UI:** Sidebar file-tree scroll; compact **New** control beside **+** folder button
+- **CI:** Actix 3.20 still pulls vulnerable `h2` 0.3.x in the lockfile; engine stays on **Axum** so `cargo audit` passes
+- **UI:** Sidebar file-tree scroll; compact **📄** / **+** toolbar buttons (same size)
 - **Portable:** `MarkDownUltimate.exe` only from sibling **`MarkDown-Ultimate`** folder (or set `MDU_PORTABLE_ROOT`); clear error if run from dev root without `dist/`
 - **Privacy:** Release docs use generic paths only; artifacts scanned before upload
 

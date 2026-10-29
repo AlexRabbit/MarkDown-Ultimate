@@ -1,6 +1,6 @@
 param(
-    [string]$Tag = "v0.2.2",
-    [string]$Title = "v0.2.2",
+    [string]$Tag = "v0.2.4",
+    [string]$Title = "v0.2.4",
     [string]$NotesFile = ""
 )
 $ErrorActionPreference = "Stop"

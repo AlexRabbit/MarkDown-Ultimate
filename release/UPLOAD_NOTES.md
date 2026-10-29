@@ -23,6 +23,8 @@ cd ..
 ## GitHub Release
 
 ```powershell
+.\QTestings\scan-repo-before-push.ps1
+git push origin main
 gh auth login
 .\QTestings\create-github-release.ps1 -Tag v0.2.4
 ```

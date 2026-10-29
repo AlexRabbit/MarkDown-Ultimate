@@ -415,8 +415,8 @@ pub fn App() -> impl IntoView {
                                     }
                                     Err(e) => emit(Severity::Warn, "workspace", "create_failed", "frontend", e.to_string(), None, None),
                                 }
-                            }>"New"</button>
-                        <button id="btnNewFolder" type="button" class="icon-btn" title="New folder" data-tour-id="btnNewFolder"
+                            }>"📄"</button>
+                        <button id="btnNewFolder" type="button" class="icon-btn icon-sm" title="New folder" data-tour-id="btnNewFolder"
                             on:click=move |_| {
                                 let mut ws = workspace.get_untracked();
                                 let name = ws.unique_sibling_name(None, "New folder");

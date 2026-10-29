@@ -10,6 +10,8 @@
 .vscode/
 .cursor/
 aimemos/
+apps/target/
+code/diagnostics/logs/
 *.pdb
 release/*
 !release/UPLOAD_NOTES.md

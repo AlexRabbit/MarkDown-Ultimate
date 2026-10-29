@@ -119,11 +119,19 @@ fn exe_root() -> Result<PathBuf, String> {
 
     Err(format!(
         "dist/index.html not found next to {}.\n\
-         Run portable-bundle.ps1, then start:\n\
-         ..\\MarkDown-Ultimate\\MarkDownUltimate.exe\n\
-         (Do not run a lone .exe copied out of that folder.)",
-        dir.display()
+         Portable app folder (run this exe):\n\
+         {}\\MarkDown-Ultimate\\MarkDownUltimate.exe\n\
+         Build: tools\\portable-bundle.ps1 from the dev repo.",
+        dir.display(),
+        parent_sibling(&dir)
     ))
+}
+
+fn parent_sibling(dir: &Path) -> String {
+    dir.parent()
+        .and_then(|p| p.parent())
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|| "..".into())
 }
 
 struct PythonCmd {

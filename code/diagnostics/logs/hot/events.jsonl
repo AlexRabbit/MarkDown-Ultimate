@@ -1,1 +1,0 @@
-{"schema_version":1,"event_id":"6d1cb065-6bc5-4352-8871-1978c7a06b3a","trace_id":"3e81d53f-a659-469f-892c-797c86e845d5","timestamp":"2026-10-28T18:39:09.050235200Z","severity":"info","category":"test","event_type":"unit","component":"mu_diagnostics","message":"hello"}

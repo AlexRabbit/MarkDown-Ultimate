@@ -8,7 +8,7 @@ description = "MarkDown Ultimate — Dioxus mobile shell (Android APK)"
 
 [features]
 default = []
-mobile = ["dioxus/mobile"]
+mobile = []
 
 [dependencies]
-dioxus = { version = "0.7", features = ["mobile"] }
+dioxus = { version = "0.7", features = ["mobile", "launch"] }
