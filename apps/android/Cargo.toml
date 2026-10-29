@@ -4,7 +4,11 @@ version = "0.1.0"
 edition = "2021"
 authors = ["AlexRabbit"]
 license = "MIT"
-description = "MarkDown Ultimate — Dioxus mobile scaffold (Android)"
+description = "MarkDown Ultimate — Dioxus mobile shell (Android APK)"
+
+[features]
+default = []
+mobile = ["dioxus/mobile"]
 
 [dependencies]
-dioxus = { version = "0.6", features = ["mobile"] }
+dioxus = { version = "0.7", features = ["mobile"] }

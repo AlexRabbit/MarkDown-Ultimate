@@ -122,7 +122,7 @@ trunk serve
 
 **Distribution:** develop in **repo root**; ship downloads via **[GitHub Releases](https://github.com/AlexRabbit/MarkDown-Ultimate/releases)** and **[GitHub Pages](https://alexrabbit.github.io/MarkDown-Ultimate/)**. Build outputs go to gitignored `release\artifacts\` only (not a nested full project copy).
 
-**Portable Windows (native app, no browser):** run `powershell -File tools\portable-bundle.ps1` → install folder **`A:\VibeCode\MarkDown-Ultimate\`** → double-click **`MarkDownUltimate.exe`**. GitHub upload copies only: `release\artifacts\MarkDownUltimate.exe` + zip. Details: `release\UPLOAD_NOTES.md`.
+**Portable Windows:** `powershell -File tools\portable-bundle.ps1` or `prepare-release.ps1` → `release\artifacts\MarkDown-Ultimate-Portable.exe` (+ zip). Details: `release\UPLOAD_NOTES.md`.
 
 **Android:** `apps/` Dioxus scaffold — APK when SDK/`dx` are configured (`QTestings\build-android.ps1`).
 

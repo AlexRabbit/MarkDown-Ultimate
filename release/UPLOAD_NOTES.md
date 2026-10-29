@@ -2,33 +2,29 @@
 
 | What | Path |
 |------|------|
-| **Source / dev** | `A:\VibeCode\MarkDown Ultimate\` — edit code, run `Launch-MarkDownUltimate.bat` (browser + local server) |
-| **Portable Windows app** | `A:\VibeCode\MarkDown-Ultimate\` — double-click **`MarkDownUltimate.exe`** (native window, no extra CMD, no external browser) |
-| **GitHub Releases upload** | `release\artifacts\` — only **`MarkDownUltimate.exe`**, **`MarkDownUltimate-Portable.zip`**, **`MarkDown-Ultimate.apk`** (staging, gitignored) |
+| **Source / dev** | Your git clone (repo root) — `Launch-MarkDownUltimate.bat` opens the browser + local server |
+| **Portable Windows app** | Sibling folder **`MarkDown-Ultimate`** next to the repo (created by `portable-bundle.ps1`) — run **`MarkDownUltimate.exe`** |
+| **GitHub Releases** | `release/artifacts/` — `MarkDownUltimate.exe`, zip, APK (gitignored staging) |
 
-We **do not** create `release\MarkDown-Ultimate\` or nested `MarkDown-Ultimate-Portable\` copies anymore.  
-Run `tools\cleanup-release-duplicates.ps1` if old duplicates remain.
+Set **`MDU_PORTABLE_ROOT`** to override the portable install folder.
 
-## Build portable + staging assets
+We do **not** ship a second full copy of the repo under `release/MarkDown-Ultimate/`.
+
+## Build
 
 ```powershell
-cd "A:\VibeCode\MarkDown Ultimate"
+cd frontend
+trunk build --release
+cd ..
 .\tools\portable-bundle.ps1
+.\QTestings\build-android.ps1
 ```
 
 ## GitHub Release
 
 ```powershell
-& "${env:ProgramFiles}\GitHub CLI\gh.exe" auth login
-.\QTestings\create-github-release.ps1 -Tag v0.2.3
+gh auth login
+.\QTestings\create-github-release.ps1 -Tag v0.2.4
 ```
 
-## Android APK
-
-Requires Android Studio SDK + `cargo install dioxus-cli`, then:
-
-```powershell
-.\QTestings\build-android.ps1
-```
-
-Output: `release\artifacts\MarkDown-Ultimate.apk`
+Do **not** run `MarkDownUltimate.exe` from the dev repo root unless `dist/` and `python/` sit beside that exe (use the portable folder instead).

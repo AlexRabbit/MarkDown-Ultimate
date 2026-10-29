@@ -14,5 +14,5 @@ foreach ($p in $remove) {
     }
 }
 Write-Host "Dev repo (source): $root"
-Write-Host "Portable app (only copy to run): $(if ($env:MDU_PORTABLE_ROOT) { $env:MDU_PORTABLE_ROOT } else { 'A:\VibeCode\MarkDown-Ultimate' })"
+Write-Host "Portable app (only copy to run): $(if ($env:MDU_PORTABLE_ROOT) { $env:MDU_PORTABLE_ROOT } else { Join-Path (Split-Path $root -Parent) 'MarkDown-Ultimate' })"
 Write-Host "GitHub staging only: $(Join-Path $root 'release\artifacts') (exe + zip + apk, not a full tree)"

@@ -28,10 +28,7 @@ fn run() -> Result<(), String> {
 
     let index = root.join("dist").join("index.html");
     if !index.is_file() {
-        return Err(format!(
-            "dist/index.html not found in {}. Re-run portable-bundle from repo root.",
-            root.display()
-        ));
+        return Err(format!("Missing {}", index.display()));
     }
 
     let port = env::var("MDU_PORT").unwrap_or_else(|_| DEFAULT_PORT.to_string());
@@ -104,10 +101,29 @@ fn start_server(root: &Path, port: &str) -> Result<(), String> {
 }
 
 fn exe_root() -> Result<PathBuf, String> {
-    env::current_exe()
+    let dir = env::current_exe()
         .ok()
         .and_then(|p| p.parent().map(|d| d.to_path_buf()))
-        .ok_or_else(|| "Could not resolve launcher directory".to_string())
+        .ok_or_else(|| "Could not resolve launcher directory".to_string())?;
+
+    if dir.join("dist").join("index.html").is_file() {
+        return Ok(dir);
+    }
+
+    if let Ok(custom) = env::var("MDU_PORTABLE_ROOT") {
+        let p = PathBuf::from(custom);
+        if p.join("dist").join("index.html").is_file() {
+            return Ok(p);
+        }
+    }
+
+    Err(format!(
+        "dist/index.html not found next to {}.\n\
+         Run portable-bundle.ps1, then start:\n\
+         ..\\MarkDown-Ultimate\\MarkDownUltimate.exe\n\
+         (Do not run a lone .exe copied out of that folder.)",
+        dir.display()
+    ))
 }
 
 struct PythonCmd {

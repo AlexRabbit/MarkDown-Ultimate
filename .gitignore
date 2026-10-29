@@ -17,3 +17,7 @@ release/*
 !release/SECURITY_CHECK.md
 tools/mdu-launcher/target/
 portable/
+/MarkDownUltimate.exe
+/MarkDownUltimate.exe.WebView2/
+/python/
+/logs/hot/*.log

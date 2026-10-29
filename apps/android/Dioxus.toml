@@ -1,0 +1,14 @@
+[application]
+name = "MarkDown Ultimate"
+default_platform = "android"
+
+[web.app]
+title = "MarkDown Ultimate"
+
+[android]
+package = "com.alexrabbit.markdownultimate"
+version_name = "0.2.4"
+version_code = 204
+
+[android.permissions]
+INTERNET = true

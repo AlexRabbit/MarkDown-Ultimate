@@ -3,7 +3,11 @@ $root = Split-Path $PSScriptRoot -Parent
 & (Join-Path $root "tools\cleanup-release-duplicates.ps1")
 
 # ONE portable install folder (not nested under release/, not a second copy of the repo).
-$portableRoot = if ($env:MDU_PORTABLE_ROOT) { $env:MDU_PORTABLE_ROOT } else { "A:\VibeCode\MarkDown-Ultimate" }
+$portableRoot = if ($env:MDU_PORTABLE_ROOT) {
+    $env:MDU_PORTABLE_ROOT
+} else {
+    Join-Path (Split-Path $root -Parent) "MarkDown-Ultimate"
+}
 $artifacts = Join-Path $root "release\artifacts"
 $pyDir = Join-Path $portableRoot "python"
 

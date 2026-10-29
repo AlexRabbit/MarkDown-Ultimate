@@ -386,17 +386,6 @@ pub fn App() -> impl IntoView {
         <div class="shell">
             <header class="topbar">
                 <div class="actions">
-                    <button id="btnCreate" type="button" data-tour-id="btnCreate" on:click=move |_| {
-                        let mut ws = workspace.get_untracked();
-                        match ws.add_file(None, &format!("Untitled-{}.md", short_id()), String::new()) {
-                            Ok(id) => {
-                                persist.run(ws);
-                                set_active_id.set(id);
-                                emit(Severity::Info, "workspace", "create", "frontend", "new file", None, None);
-                            }
-                            Err(e) => emit(Severity::Warn, "workspace", "create_failed", "frontend", e.to_string(), None, None),
-                        }
-                    }>"Create"</button>
                     <button id="btnOpen" type="button" data-tour-id="btnOpen" on:click=move |_| set_modal.set(ModalKind::Import)>"Open"</button>
                     <button id="btnSave" type="button" data-tour-id="btnSave" on:click=move |_| set_modal.set(ModalKind::Export)>"Save"</button>
                     <button id="btnDiagnostics" type="button" data-tour-id="btnDiagnostics" on:click=move |_| set_modal.set(ModalKind::Diagnostics)>"Diagnostics"</button>
@@ -414,6 +403,19 @@ pub fn App() -> impl IntoView {
                     }>
                     <div class="sidebar-head">
                         <span>"Files"</span>
+                        <div class="sidebar-toolbar">
+                        <button id="btnCreate" type="button" class="icon-btn icon-sm" title="New file" data-tour-id="btnCreate"
+                            on:click=move |_| {
+                                let mut ws = workspace.get_untracked();
+                                match ws.add_file(None, &format!("Untitled-{}.md", short_id()), String::new()) {
+                                    Ok(id) => {
+                                        persist.run(ws);
+                                        set_active_id.set(id);
+                                        emit(Severity::Info, "workspace", "create", "frontend", "new file", None, None);
+                                    }
+                                    Err(e) => emit(Severity::Warn, "workspace", "create_failed", "frontend", e.to_string(), None, None),
+                                }
+                            }>"New"</button>
                         <button id="btnNewFolder" type="button" class="icon-btn" title="New folder" data-tour-id="btnNewFolder"
                             on:click=move |_| {
                                 let mut ws = workspace.get_untracked();
@@ -426,6 +428,7 @@ pub fn App() -> impl IntoView {
                                     Err(e) => emit(Severity::Warn, "workspace", "folder_create_failed", "frontend", e.to_string(), None, None),
                                 }
                             }>"+"</button>
+                        </div>
                     </div>
                     <div class="sidebar-tree-scroll">
                     <TreeView

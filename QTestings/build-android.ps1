@@ -29,7 +29,13 @@ if (-not $dx) {
 
 Push-Location (Join-Path $root "apps")
 try {
-    & $dx bundle --android --package-types apk -r -p mdu_android --out-dir $artifacts 2>&1 | Tee-Object -FilePath $log -Append
+    Write-Log "Prefetch: cargo fetch --locked"
+    cargo fetch --locked 2>&1 | Out-Null
+    Write-Log "Warmup: cargo metadata"
+    cargo metadata --format-version 1 2>&1 | Out-Null
+    Push-Location (Join-Path $root "apps\android")
+    & $dx bundle --android --package-types apk -r --out-dir $artifacts 2>&1 | Tee-Object -FilePath $log -Append
+    Pop-Location
     $apk = Get-ChildItem -Path $artifacts -Recurse -Filter "*.apk" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
     if (-not $apk) {
         $apk = Get-ChildItem -Path (Join-Path $root "apps") -Recurse -Filter "*.apk" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1

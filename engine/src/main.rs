@@ -1,16 +1,22 @@
-use actix_files::Files;
-use actix_web::{web, App, HttpResponse, HttpServer};
+use axum::{
+    extract::State,
+    http::StatusCode,
+    response::{IntoResponse, Redirect},
+    routing::get,
+    Json, Router,
+};
 use mu_diagnostics::{emit, Severity};
 use mu_persistence::FileWorkspaceStore;
 use mu_workspace::Workspace;
 use std::sync::{Arc, Mutex};
+use tower_http::services::ServeDir;
 
 struct AppState {
     store: FileWorkspaceStore,
     workspace: Mutex<Workspace>,
 }
 
-async fn health() -> HttpResponse {
+async fn health() -> impl IntoResponse {
     emit(
         Severity::Debug,
         "engine",
@@ -20,27 +26,23 @@ async fn health() -> HttpResponse {
         None,
         None,
     );
-    HttpResponse::Ok().json(serde_json::json!({
-        "status": "ok",
-        "service": "markdown_ultimate_engine"
-    }))
+    Json(serde_json::json!({"status":"ok","service":"markdown_ultimate_engine"}))
 }
 
-async fn get_workspace(data: web::Data<Arc<AppState>>) -> HttpResponse {
-    let ws = data.workspace.lock().unwrap().clone();
-    HttpResponse::Ok().json(ws)
+async fn get_workspace(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let ws = state.workspace.lock().unwrap().clone();
+    Json(ws)
 }
 
 async fn put_workspace(
-    data: web::Data<Arc<AppState>>,
-    body: web::Json<Workspace>,
-) -> HttpResponse {
-    let ws = body.into_inner();
+    State(state): State<Arc<AppState>>,
+    Json(ws): Json<Workspace>,
+) -> impl IntoResponse {
     {
-        let mut guard = data.workspace.lock().unwrap();
+        let mut guard = state.workspace.lock().unwrap();
         *guard = ws.clone();
     }
-    match data.store.save(&ws) {
+    match state.store.save(&ws) {
         Ok(()) => {
             emit(
                 Severity::Info,
@@ -52,7 +54,7 @@ async fn put_workspace(
                 None,
             );
             publish_nats_event("mdu.workspace.updated");
-            HttpResponse::Ok().json(serde_json::json!({"ok": true}))
+            (StatusCode::OK, Json(serde_json::json!({"ok": true}))).into_response()
         }
         Err(e) => {
             emit(
@@ -64,7 +66,11 @@ async fn put_workspace(
                 None,
                 None,
             );
-            HttpResponse::InternalServerError().json(serde_json::json!({"ok": false}))
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"ok": false})),
+            )
+                .into_response()
         }
     }
 }
@@ -86,8 +92,8 @@ fn publish_nats_event(subject: &str) {
     });
 }
 
-#[actix_web::main]
-async fn main() -> std::io::Result<()> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cfg = mu_config::load_from_env_file(".env").unwrap_or_default();
     std::env::set_var("LOGS_DIR", &cfg.logs_dir);
     let bind = cfg.engine_bind.clone();
@@ -98,7 +104,7 @@ async fn main() -> std::io::Result<()> {
         "engine",
         "startup",
         "engine",
-        format!("Starting Actix engine on {bind} mode={}", cfg.app_mode),
+        format!("Starting engine on {bind} mode={}", cfg.app_mode),
         None,
         None,
     );
@@ -107,21 +113,20 @@ async fn main() -> std::io::Result<()> {
         workspace: Mutex::new(workspace),
     });
 
-    HttpServer::new(move || {
-        App::new()
-            .app_data(web::Data::new(state.clone()))
-            .route("/health", web::get().to(health))
-            .service(
-                web::resource("/api/workspace")
-                    .route(web::get().to(get_workspace))
-                    .route(web::put().to(put_workspace)),
-            )
-            .service(web::redirect("/", "/MarkDown-Ultimate/"))
-            .service(
-                Files::new("/MarkDown-Ultimate", "./dist").index_file("index.html"),
-            )
-    })
-    .bind(&bind)?
-    .run()
-    .await
+    let app = Router::new()
+        .route("/health", get(health))
+        .route(
+            "/api/workspace",
+            get(get_workspace).put(put_workspace),
+        )
+        .route("/", get(|| async { Redirect::temporary("/MarkDown-Ultimate/") }))
+        .nest_service(
+            "/MarkDown-Ultimate",
+            ServeDir::new("./dist").append_index_html_on_directories(true),
+        )
+        .with_state(state);
+
+    let listener = tokio::net::TcpListener::bind(&bind).await?;
+    axum::serve(listener, app).await?;
+    Ok(())
 }
