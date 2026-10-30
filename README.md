@@ -10,7 +10,8 @@
 </p>
 
 ---
-
+![Preview](https://raw.githubusercontent.com/AlexRabbit/MarkDown-Ultimate/refs/heads/main/PREVIEW.png)
+---
 ## What it is
 
 **MarkDown Ultimate** is a writing app for Markdown: the plain, readable format used for notes, docs, and README files. You work in your browser or in a small desktop window — no account required for the online version.
