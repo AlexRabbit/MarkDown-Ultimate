@@ -28,7 +28,18 @@ body { background: var(--bg); color: var(--text); }
 .sidebar-head { display: flex; align-items: center; justify-content: space-between; padding: .35rem .25rem .5rem; font-weight: 600; font-size: .85rem; flex-shrink: 0; }
 .sidebar-toolbar { display: flex; align-items: center; gap: .25rem; }
 .icon-btn.icon-sm { font-size: .75rem; padding: .12rem .38rem; min-width: 1.65rem; }
-.outline-panel { border-top: 1px solid var(--border); margin-top: .5rem; padding-top: .35rem; flex: 0 1 auto; max-height: min(32vh, 240px); min-height: 3rem; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+.outline-panel { border-top: 1px solid var(--border); margin-top: 0; padding-top: 0; flex: 0 0 auto; display: flex; flex-direction: column; min-height: 4.5rem; max-height: 55vh; overflow: hidden; }
+.outline-resize-handle {
+  flex-shrink: 0;
+  height: 7px;
+  margin-top: .35rem;
+  cursor: row-resize;
+  touch-action: none;
+  background: linear-gradient(180deg, transparent, var(--border) 45%, transparent);
+  border-radius: 4px;
+}
+body.mdu-resizing-outline { cursor: row-resize; user-select: none; }
+.outline-list-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; padding: 0 .15rem .25rem; }
 .icon-btn, .kebab {
   border: 1px solid var(--border); background: var(--panel); border-radius: .35rem;
   cursor: pointer; font-size: .85rem; line-height: 1; padding: .15rem .45rem;
@@ -49,13 +60,41 @@ body { background: var(--bg); color: var(--text); }
 .editor { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
 .editor-surface { flex: 1; min-height: 0; min-width: 0; }
 .editor-surface.split { display: grid; grid-template-columns: 1fr 1fr; height: 100%; }
-.editor-surface.preview-mode { position: relative; height: 100%; }
-.source { width: 100%; height: 100%; border: 0; padding: 1rem; resize: none; font-family: ui-monospace, monospace; font-size: .9rem; background: var(--panel); }
-.source.preview-overlay {
-  position: absolute; inset: 0; z-index: 2; opacity: 0; color: transparent; caret-color: var(--text);
-  background: transparent; resize: none;
+.editor-surface.preview-mode {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
-.preview-front { position: relative; z-index: 1; pointer-events: none; }
+.preview-mode-stack {
+  position: relative;
+  min-height: 100%;
+}
+.source {
+  width: 100%; height: 100%; border: 0; padding: 1rem; resize: none;
+  font-family: ui-monospace, monospace; font-size: .9rem; background: var(--panel);
+}
+.source.preview-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  opacity: 0;
+  color: transparent;
+  caret-color: var(--text);
+  background: transparent;
+  resize: none;
+  overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+.preview-front {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+  min-height: 100%;
+}
 .tools-toggle {
   position: absolute; right: 0; top: 50%; transform: translateY(-50%); z-index: 5;
   border: 1px solid var(--border); border-right: 0; border-radius: .5rem 0 0 .5rem;

@@ -37,6 +37,7 @@ window.mduRenderMath = function (rootSelector) {
     ],
     throwOnError: false,
   });
+  if (window.mduSyncPreviewLayout) window.mduSyncPreviewLayout();
 };
 
 window.mduApplyEditorCommand = function (editorId, before, after, placeholder) {
@@ -148,6 +149,113 @@ window.mduJumpToOffset = function (editorId, offset) {
   var o = Math.max(0, Math.min(el.value.length, offset));
   el.focus();
   el.selectionStart = el.selectionEnd = o;
+
+  var textBefore = el.value.slice(0, o);
+  var lineStart = el.value.lastIndexOf("\n", o - 1) + 1;
+  var lineEnd = el.value.indexOf("\n", o);
+  if (lineEnd === -1) lineEnd = el.value.length;
+  var headingLine = el.value.slice(lineStart, lineEnd);
+  var hm = headingLine.match(/^#{1,6}\s+(.*)/);
+
+  var style = window.getComputedStyle(el);
+  var lineHeight =
+    parseFloat(style.lineHeight) ||
+    parseFloat(style.fontSize) * 1.35 ||
+    20;
+  var lineIndex = textBefore.split("\n").length;
+  var scrollTop = Math.max(0, (lineIndex - 2) * lineHeight);
+  el.scrollTop = scrollTop;
+
+  var previewSurface = document.querySelector(".editor-surface.preview-mode");
+  if (previewSurface) {
+    previewSurface.scrollTop = scrollTop;
+  }
+
+  var preview = document.getElementById("previewPane");
+  if (preview && hm) {
+    var title = hm[1].trim();
+    var heads = preview.querySelectorAll("h1,h2,h3,h4,h5,h6");
+    for (var i = 0; i < heads.length; i++) {
+      if (heads[i].textContent.trim() === title) {
+        heads[i].scrollIntoView({ block: "start", behavior: "smooth" });
+        if (previewSurface) {
+          var rect = heads[i].getBoundingClientRect();
+          var srect = previewSurface.getBoundingClientRect();
+          previewSurface.scrollTop += rect.top - srect.top - 12;
+        } else {
+          var splitPreview = preview.closest(".preview");
+          if (splitPreview) {
+            var r2 = heads[i].getBoundingClientRect();
+            var s2 = splitPreview.getBoundingClientRect();
+            splitPreview.scrollTop += r2.top - s2.top - 12;
+          }
+        }
+        break;
+      }
+    }
+  }
+};
+
+window.mduSyncPreviewLayout = function () {
+  var surface = document.querySelector(".editor-surface.preview-mode");
+  var stack = document.getElementById("previewModeStack");
+  var preview = document.getElementById("previewPane");
+  var ta = document.getElementById("mduSourceEditor");
+  if (!surface || !stack || !preview || !ta) return;
+  var h = Math.max(preview.scrollHeight, surface.clientHeight, 320);
+  stack.style.minHeight = h + "px";
+  ta.style.height = h + "px";
+  if (!ta._mduPreviewScrollBound) {
+    ta._mduPreviewScrollBound = true;
+    var syncing = false;
+    ta.addEventListener("scroll", function () {
+      if (syncing) return;
+      syncing = true;
+      surface.scrollTop = ta.scrollTop;
+      syncing = false;
+    });
+    surface.addEventListener("scroll", function () {
+      if (syncing) return;
+      syncing = true;
+      ta.scrollTop = surface.scrollTop;
+      syncing = false;
+    });
+  }
+};
+
+window.mduInitOutlineResize = function (handleId, panelId, storageKey) {
+  var handle = document.getElementById(handleId);
+  var panel = document.getElementById(panelId);
+  if (!handle || !panel || handle._mduOutlineBound) return;
+  handle._mduOutlineBound = true;
+  var dragging = false;
+  var startY = 0;
+  var startH = 0;
+  handle.addEventListener("mousedown", function (ev) {
+    dragging = true;
+    startY = ev.clientY;
+    startH = panel.getBoundingClientRect().height;
+    ev.preventDefault();
+    document.body.classList.add("mdu-resizing-outline");
+  });
+  window.addEventListener("mousemove", function (ev) {
+    if (!dragging) return;
+    var delta = startY - ev.clientY;
+    var next = Math.max(72, Math.min(window.innerHeight * 0.55, startH + delta));
+    panel.style.height = next + "px";
+  });
+  window.addEventListener("mouseup", function () {
+    if (!dragging) return;
+    dragging = false;
+    document.body.classList.remove("mdu-resizing-outline");
+    var h = panel.getBoundingClientRect().height;
+    try {
+      localStorage.setItem(storageKey, String(Math.round(h)));
+    } catch (e) {}
+    window.dispatchEvent(
+      new CustomEvent("mdu-outline-height", { detail: Math.round(h) })
+    );
+  });
 };
 
 function mduLineAt(text, pos) {

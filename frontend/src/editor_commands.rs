@@ -25,8 +25,16 @@ extern "C" {
     fn mdu_jump_to_offset(editor_id: &str, offset: u32);
     #[wasm_bindgen(js_namespace = window, js_name = mduFindReplace)]
     fn mdu_find_replace(editor_id: &str, find: &str, replace: &str, replace_all: bool) -> JsValue;
+    #[wasm_bindgen(js_namespace = window, js_name = mduInitOutlineResize)]
+    fn mdu_init_outline_resize(handle_id: &str, panel_id: &str, storage_key: &str);
+    #[wasm_bindgen(js_namespace = window, js_name = mduSyncPreviewLayout)]
+    fn mdu_sync_preview_layout();
     #[wasm_bindgen(js_namespace = window, js_name = mduInitAppShortcuts)]
     fn mdu_init_app_shortcuts();
+}
+
+pub fn sync_preview_layout() {
+    mdu_sync_preview_layout();
 }
 
 const EDITOR_ID: &str = "mduSourceEditor";

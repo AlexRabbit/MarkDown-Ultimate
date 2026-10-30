@@ -12,14 +12,23 @@ use wasm_bindgen_futures::JsFuture;
 use web_sys::{Blob, BlobPropertyBag, FileReader, RequestMode, Url};
 
 use crate::command_registry::{command_by_id, shortcut_lines, CommandKind, EditorCommand};
-use crate::editor_commands::{copy_text, find_replace, init_editor_shortcuts, jump_to_offset, print_markdown};
+use crate::editor_commands::{copy_text, find_replace, init_editor_shortcuts, jump_to_offset, print_markdown, sync_preview_layout};
 use crate::tools_sidebar::{
     load_tools_open, load_tools_width, run_command_on_editor, ToolsSidebar,
 };
 
 const STORAGE_KEY: &str = "mdu_workspace_v1";
 const PULSE_KEY: &str = "mdu_howto_pulse_seen";
+const OUTLINE_HEIGHT_KEY: &str = "mdu_outline_height";
 const TOUR_STEPS: &str = include_str!("../tour/registry.json");
+
+fn load_outline_height() -> u32 {
+    LocalStorage::get(OUTLINE_HEIGHT_KEY).unwrap_or(168)
+}
+
+fn save_outline_height(h: u32) {
+    let _ = LocalStorage::set(OUTLINE_HEIGHT_KEY, h);
+}
 
 #[wasm_bindgen]
 extern "C" {
@@ -27,6 +36,8 @@ extern "C" {
     fn mduStartTour(steps_json: &str);
     #[wasm_bindgen(js_namespace = window)]
     fn mduRenderMath(selector: &str);
+    #[wasm_bindgen(js_namespace = window, js_name = mduInitOutlineResize)]
+    fn mdu_init_outline_resize(handle_id: &str, panel_id: &str, storage_key: &str);
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -204,15 +215,18 @@ fn editor_body(
         }.into_any(),
         ViewMode::Preview => view! {
             <div class="editor-surface preview-mode">
-                <textarea id="mduSourceEditor" class="source preview-overlay" spellcheck="true"
-                    prop:value=move || content.get()
-                    on:input=move |ev| {
-                        let ta: web_sys::HtmlTextAreaElement = event_target(&ev);
-                        let v = ta.value();
-                        set_content.set(v.clone());
-                        save(v);
-                    }></textarea>
-                <div id="previewPane" class="preview preview-front" inner_html=move || render_markdown(&content.get())></div>
+                <div class="preview-mode-stack" id="previewModeStack">
+                    <div id="previewPane" class="preview preview-front" inner_html=move || render_markdown(&content.get())></div>
+                    <textarea id="mduSourceEditor" class="source preview-overlay" spellcheck="true"
+                        prop:value=move || content.get()
+                        on:input=move |ev| {
+                            let ta: web_sys::HtmlTextAreaElement = event_target(&ev);
+                            let v = ta.value();
+                            set_content.set(v.clone());
+                            save(v);
+                            schedule_preview_layout_sync();
+                        }></textarea>
+                </div>
             </div>
         }.into_any(),
     }
@@ -250,6 +264,22 @@ pub fn App() -> impl IntoView {
     let (engine_online, set_engine_online) = signal(false);
     let (tools_open, set_tools_open) = signal(load_tools_open());
     let (tools_width, set_tools_width) = signal(load_tools_width());
+    let (outline_height, set_outline_height) = signal(load_outline_height());
+
+    Effect::new(move |_| {
+        mdu_init_outline_resize("outlineResizeHandle", "docOutline", OUTLINE_HEIGHT_KEY);
+        let set_h = set_outline_height;
+        let closure = Closure::wrap(Box::new(move |ev: web_sys::CustomEvent| {
+            if let Some(h) = ev.detail().as_f64() {
+                let h = h as u32;
+                set_h.set(h);
+                save_outline_height(h);
+            }
+        }) as Box<dyn FnMut(_)>);
+        let window = web_sys::window().unwrap();
+        let _ = window.add_event_listener_with_callback("mdu-outline-height", closure.as_ref().unchecked_ref());
+        closure.forget();
+    });
 
     if show_pulse.get_untracked() && !LocalStorage::get::<bool>(PULSE_KEY).unwrap_or(false) {
         schedule_pulse_stop(set_show_pulse);
@@ -272,6 +302,9 @@ pub fn App() -> impl IntoView {
         let mode = view_mode.get();
         if mode == ViewMode::Split || mode == ViewMode::Preview {
             schedule_math_render();
+        }
+        if mode == ViewMode::Preview {
+            schedule_preview_layout_sync();
         }
     });
 
@@ -447,7 +480,7 @@ pub fn App() -> impl IntoView {
                         set_collapsed_folders=set_collapsed_folders
                     />
                     </div>
-                    <OutlinePanel content=content />
+                    <OutlinePanel content=content height_px=outline_height />
                 </aside>
                 <div class="center-column">
                 <section class="editor-pane">
@@ -494,26 +527,33 @@ pub fn App() -> impl IntoView {
 }
 
 #[component]
-fn OutlinePanel(content: ReadSignal<String>) -> impl IntoView {
+fn OutlinePanel(content: ReadSignal<String>, height_px: ReadSignal<u32>) -> impl IntoView {
     view! {
-        <div class="outline-panel" id="docOutline" data-tour-id="docOutline">
-            <div class="outline-head">"Outline"</div>
-            <ul class="outline-list">
-                {move || {
-                    scan_headings(&content.get()).into_iter().map(|(level, title, offset)| {
-                        let off = offset as u32;
-                        view! {
-                            <li class="outline-item" style=format!("padding-left:{}rem", (level as f32 - 1.0) * 0.65 + 0.35)>
-                                <button type="button" class="outline-link"
-                                    on:click=move |_| jump_to_offset(off)>
-                                    {title}
-                                </button>
-                            </li>
-                        }
-                    }).collect_view()
-                }}
-            </ul>
-        </div>
+        <>
+            <div id="outlineResizeHandle" class="outline-resize-handle" role="separator"
+                aria-orientation="horizontal" aria-label="Resize outline panel" title="Drag to resize outline"></div>
+            <div class="outline-panel" id="docOutline" data-tour-id="docOutline"
+                style=move || format!("height:{}px", height_px.get())>
+                <div class="outline-head">"Outline"</div>
+                <div class="outline-list-scroll">
+                    <ul class="outline-list">
+                        {move || {
+                            scan_headings(&content.get()).into_iter().map(|(level, title, offset)| {
+                                let off = offset as u32;
+                                view! {
+                                    <li class="outline-item" style=format!("padding-left:{}rem", (level as f32 - 1.0) * 0.65 + 0.35)>
+                                        <button type="button" class="outline-link"
+                                            on:click=move |_| jump_to_offset(off)>
+                                            {title}
+                                        </button>
+                                    </li>
+                                }
+                            }).collect_view()
+                        }}
+                    </ul>
+                </div>
+            </div>
+        </>
     }
 }
 
@@ -1115,6 +1155,21 @@ fn schedule_math_render() {
     let _ = window.set_timeout_with_callback_and_timeout_and_arguments_0(
         closure.as_ref().unchecked_ref(),
         30,
+    );
+    closure.forget();
+}
+
+fn schedule_preview_layout_sync() {
+    let window = match web_sys::window() {
+        Some(w) => w,
+        None => return,
+    };
+    let closure = Closure::wrap(Box::new(move || {
+        sync_preview_layout();
+    }) as Box<dyn FnMut()>);
+    let _ = window.set_timeout_with_callback_and_timeout_and_arguments_0(
+        closure.as_ref().unchecked_ref(),
+        40,
     );
     closure.forget();
 }
