@@ -5,10 +5,16 @@ default_platform = "android"
 [web.app]
 title = "MarkDown Ultimate"
 
-[android]
-package = "com.alexrabbit.markdownultimate"
-version_name = "0.2.4"
-version_code = 204
+[bundle]
+identifier = "com.alexrabbit.markdownultimate"
+publisher = "AlexRabbit"
 
-[android.permissions.INTERNET]
+[android]
+identifier = "com.alexrabbit.markdownultimate"
+min_sdk = 21
+target_sdk = 34
+version_name = "0.2.5"
+version_code = 205
+
+[android.permissions."android.permission.INTERNET"]
 description = "Load the MarkDown Ultimate web app from GitHub Pages"
