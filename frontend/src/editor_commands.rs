@@ -31,6 +31,12 @@ extern "C" {
     fn mdu_sync_preview_layout();
     #[wasm_bindgen(js_namespace = window, js_name = mduInitAppShortcuts)]
     fn mdu_init_app_shortcuts();
+    #[wasm_bindgen(js_namespace = window, js_name = mduInitUiZoom)]
+    fn mdu_init_ui_zoom();
+    #[wasm_bindgen(js_namespace = window, js_name = mduInitPreviewEditor)]
+    fn mdu_init_preview_editor();
+    #[wasm_bindgen(js_namespace = window, js_name = mduInitImagePaste)]
+    fn mdu_init_image_paste();
 }
 
 pub fn sync_preview_layout() {
@@ -41,6 +47,9 @@ const EDITOR_ID: &str = "mduSourceEditor";
 
 pub fn init_editor_shortcuts() {
     mdu_init_app_shortcuts();
+    mdu_init_ui_zoom();
+    mdu_init_preview_editor();
+    mdu_init_image_paste();
 }
 
 pub fn jump_to_offset(offset: u32) {

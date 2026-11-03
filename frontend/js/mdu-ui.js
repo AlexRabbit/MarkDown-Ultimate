@@ -28,19 +28,193 @@ window.mduStartTour = function (stepsJson) {
 
 window.mduRenderMath = function (rootSelector) {
   if (!window.renderMathInElement) return;
-  var el = document.querySelector(rootSelector);
-  if (!el) return;
-  window.renderMathInElement(el, {
-    delimiters: [
-      { left: "$$", right: "$$", display: true },
-      { left: "$", right: "$", display: false },
-    ],
-    throwOnError: false,
-  });
+  var parts = (rootSelector || "").split(",");
+  for (var p = 0; p < parts.length; p++) {
+    var sel = parts[p].trim();
+    if (!sel) continue;
+    var el = document.querySelector(sel);
+    if (!el) continue;
+    window.renderMathInElement(el, {
+      delimiters: [
+        { left: "$$", right: "$$", display: true },
+        { left: "$", right: "$", display: false },
+      ],
+      throwOnError: false,
+    });
+  }
   if (window.mduSyncPreviewLayout) window.mduSyncPreviewLayout();
 };
 
+function mduGetSourceTextarea() {
+  return document.getElementById("mduSourceEditor");
+}
+
+function mduPreviewEditorActive() {
+  var pe = document.getElementById("previewEditor");
+  if (!pe) return false;
+  var ae = document.activeElement;
+  return ae === pe || (ae && pe.contains(ae));
+}
+
+function mduInsertAtTextarea(el, text, selectLen) {
+  if (!el || el.tagName !== "TEXTAREA") return null;
+  var start = el.selectionStart;
+  var end = el.selectionEnd;
+  el.value = el.value.slice(0, start) + text + el.value.slice(end);
+  var cursor = start + text.length;
+  if (typeof selectLen === "number") {
+    el.selectionStart = start;
+    el.selectionEnd = start + selectLen;
+  } else {
+    el.selectionStart = el.selectionEnd = cursor;
+  }
+  el.focus();
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+  return el.value;
+}
+
+function mduWalkHtmlToMarkdown(node) {
+  if (!node) return "";
+  if (node.nodeType === 3) return node.textContent || "";
+  if (node.nodeType !== 1) return "";
+  var name = node.nodeName;
+  if (name === "BR") return "\n";
+  var inner = "";
+  for (var i = 0; i < node.childNodes.length; i++) {
+    inner += mduWalkHtmlToMarkdown(node.childNodes[i]);
+  }
+  if (name === "P" || name === "DIV") return inner.trim() + "\n\n";
+  if (name === "H1") return "# " + node.textContent.trim() + "\n\n";
+  if (name === "H2") return "## " + node.textContent.trim() + "\n\n";
+  if (name === "H3") return "### " + node.textContent.trim() + "\n\n";
+  if (name === "H4") return "#### " + node.textContent.trim() + "\n\n";
+  if (name === "H5") return "##### " + node.textContent.trim() + "\n\n";
+  if (name === "H6") return "###### " + node.textContent.trim() + "\n\n";
+  if (name === "STRONG" || name === "B") return "**" + inner + "**";
+  if (name === "EM" || name === "I") return "*" + inner + "*";
+  if (name === "S" || name === "DEL" || name === "STRIKE") return "~~" + inner + "~~";
+  if (name === "CODE") return "`" + inner + "`";
+  if (name === "PRE") return "```\n" + (node.textContent || "").trim() + "\n```\n\n";
+  if (name === "BLOCKQUOTE") {
+    return inner
+      .trim()
+      .split("\n")
+      .map(function (ln) {
+        return "> " + ln;
+      })
+      .join("\n") + "\n\n";
+  }
+  if (name === "UL") {
+    var u = "";
+    node.querySelectorAll(":scope > li").forEach(function (li) {
+      u += "- " + li.textContent.trim() + "\n";
+    });
+    return u + "\n";
+  }
+  if (name === "OL") {
+    var o = "";
+    var n = 1;
+    node.querySelectorAll(":scope > li").forEach(function (li) {
+      o += n + ". " + li.textContent.trim() + "\n";
+      n++;
+    });
+    return o + "\n";
+  }
+  if (name === "HR") return "\n---\n\n";
+  if (name === "IMG") {
+    var alt = node.getAttribute("alt") || "image";
+    var src = node.getAttribute("src") || "";
+    return "![" + alt + "](" + src + ")\n\n";
+  }
+  if (name === "A") {
+    var href = node.getAttribute("href") || "";
+    return "[" + inner + "](" + href + ")";
+  }
+  return inner;
+}
+
+window.mduHtmlToMarkdown = function (rootEl) {
+  if (!rootEl) return "";
+  var md = "";
+  for (var i = 0; i < rootEl.childNodes.length; i++) {
+    md += mduWalkHtmlToMarkdown(rootEl.childNodes[i]);
+  }
+  return md.replace(/\n{3,}/g, "\n\n").trim() + "\n";
+};
+
+window.mduSyncPreviewEditorToSource = function () {
+  var pe = document.getElementById("previewEditor");
+  var ta = mduGetSourceTextarea();
+  if (!pe || !ta) return null;
+  var md = window.mduHtmlToMarkdown(pe);
+  ta.value = md;
+  window.dispatchEvent(new CustomEvent("mdu-markdown-changed", { detail: md }));
+  return md;
+};
+
+window.mduPreviewSetFromMarkdown = function (md, html) {
+  var pe = document.getElementById("previewEditor");
+  var ta = mduGetSourceTextarea();
+  if (!pe || !ta) return;
+  if (pe._mduSkipExternalSet) return;
+  if (document.activeElement === pe || pe.contains(document.activeElement)) return;
+  ta.value = md;
+  if (pe.innerHTML !== html) {
+    pe.innerHTML = html;
+    if (window.mduRenderMath) window.mduRenderMath("#previewEditor");
+  }
+};
+
+function mduApplyPreviewCommand(before, after, placeholder) {
+  var pe = document.getElementById("previewEditor");
+  if (!pe) return null;
+  pe.focus();
+  var sel = window.getSelection();
+  var selected = sel && sel.rangeCount ? sel.toString() : "";
+  if (!selected) selected = placeholder || "";
+  if (before === "**" && after === "**") document.execCommand("bold");
+  else if (before === "*" && after === "*") document.execCommand("italic");
+  else if (before === "***" && after === "***") {
+    document.execCommand("bold");
+    document.execCommand("italic");
+  } else if (before === "~~" && after === "~~") document.execCommand("strikeThrough");
+  else if (before === "`" && after === "`") document.execCommand("insertHTML", false, "<code>" + selected.replace(/</g, "&lt;") + "</code>");
+  else if (before === "# ") document.execCommand("formatBlock", false, "h1");
+  else if (before === "## ") document.execCommand("formatBlock", false, "h2");
+  else if (before === "### ") document.execCommand("formatBlock", false, "h3");
+  else if (before === "#### ") document.execCommand("formatBlock", false, "h4");
+  else if (before === "##### ") document.execCommand("formatBlock", false, "h5");
+  else if (before === "###### ") document.execCommand("formatBlock", false, "h6");
+  else if (before === "> ") document.execCommand("formatBlock", false, "blockquote");
+  else if (before === "- " || before === "1. " || before === "- [ ] ") document.execCommand("insertUnorderedList");
+  else if (before === "![" && after.indexOf("](") !== -1) {
+    var url = window.prompt("Image URL (https:// or leave blank to paste with Ctrl+V)", "https://");
+    if (url) {
+      document.execCommand(
+        "insertHTML",
+        false,
+        '<img alt="' + selected.replace(/"/g, "") + '" src="' + url.replace(/"/g, "") + '" />'
+      );
+    }
+  } else if (before === "[" && after.indexOf("](") !== -1) {
+    var link = window.prompt("Link URL", "https://");
+    if (link) {
+      document.execCommand(
+        "insertHTML",
+        false,
+        '<a href="' + link.replace(/"/g, "") + '">' + (selected || "link") + "</a>"
+      );
+    }
+  } else document.execCommand("insertText", false, before + selected + after);
+  return window.mduSyncPreviewEditorToSource();
+}
+
 window.mduApplyEditorCommand = function (editorId, before, after, placeholder) {
+  if (mduPreviewEditorActive()) {
+    var md = mduApplyPreviewCommand(before, after, placeholder);
+    var ta = mduGetSourceTextarea();
+    return ta ? ta.value : md;
+  }
   var el = document.getElementById(editorId);
   if (!el || el.tagName !== "TEXTAREA") return null;
   var start = el.selectionStart;
@@ -58,8 +232,8 @@ window.mduApplyEditorCommand = function (editorId, before, after, placeholder) {
 
 window.mduReadEditor = function (editorId) {
   var el = document.getElementById(editorId);
-  if (!el || el.tagName !== "TEXTAREA") return null;
-  return el.value;
+  if (el && el.tagName === "TEXTAREA") return el.value;
+  return null;
 };
 
 window.mduPrintMarkdown = function (title, html) {
@@ -171,7 +345,8 @@ window.mduJumpToOffset = function (editorId, offset) {
     previewSurface.scrollTop = scrollTop;
   }
 
-  var preview = document.getElementById("previewPane");
+  var preview =
+    document.getElementById("previewEditor") || document.getElementById("previewPane");
   if (preview && hm) {
     var title = hm[1].trim();
     var heads = preview.querySelectorAll("h1,h2,h3,h4,h5,h6");
@@ -270,6 +445,20 @@ function mduIsTableLine(line) {
 }
 
 window.mduJsEditorAction = function (editorId, action) {
+  if (action === "paste-image") {
+    var el = document.getElementById(editorId);
+    if (!el || el.tagName !== "TEXTAREA") return null;
+    mduPasteImageFromClipboard(el);
+    return el.value;
+  }
+  if (action === "insert-image-url") {
+    var el2 = document.getElementById(editorId);
+    if (!el2 || el2.tagName !== "TEXTAREA") return null;
+    var url = window.prompt("Image URL (https://)", "https://");
+    if (!url) return el2.value;
+    var alt = window.prompt("Short description (optional)", "image") || "image";
+    return mduInsertAtTextarea(el2, "![" + alt + "](" + url + ")\n\n");
+  }
   var el = document.getElementById(editorId);
   if (!el || el.tagName !== "TEXTAREA") return null;
   var text = el.value;
@@ -346,4 +535,147 @@ window.mduInitAppShortcuts = function () {
       window.dispatchEvent(new CustomEvent("mdu-run-command", { detail: "italic" }));
     }
   });
+};
+
+function mduInsertImageMarkdown(targetEl, src, alt) {
+  alt = alt || "image";
+  var md = "![" + alt + "](" + src + ")\n\n";
+  if (mduPreviewEditorActive()) {
+    document.execCommand(
+      "insertHTML",
+      false,
+      '<img alt="' + alt.replace(/"/g, "") + '" src="' + src.replace(/"/g, "") + '" />'
+    );
+    return window.mduSyncPreviewEditorToSource();
+  }
+  if (targetEl && targetEl.tagName === "TEXTAREA") {
+    mduInsertAtTextarea(targetEl, md);
+    return targetEl.value;
+  }
+  return null;
+}
+
+function mduPasteImageFromClipboard(targetEl) {
+  if (!navigator.clipboard || !navigator.clipboard.read) {
+    window.alert("Copy an image, click in the document, then press Ctrl+V.");
+    return;
+  }
+  navigator.clipboard
+    .read()
+    .then(function (items) {
+      for (var i = 0; i < items.length; i++) {
+        var item = items[i];
+        for (var t = 0; t < item.types.length; t++) {
+          if (item.types[t].indexOf("image") === -1) continue;
+          item.getType(item.types[t]).then(function (blob) {
+            var reader = new FileReader();
+            reader.onload = function () {
+              mduInsertImageMarkdown(targetEl, reader.result, "pasted image");
+            };
+            reader.readAsDataURL(blob);
+          });
+          return;
+        }
+      }
+      window.alert("No image found on the clipboard. Copy a picture first, then try again.");
+    })
+    .catch(function () {
+      window.alert("Could not read the clipboard. Try Ctrl+V in the editor instead.");
+    });
+}
+
+function mduBindImagePaste(el) {
+  if (!el || el._mduImagePasteBound) return;
+  el._mduImagePasteBound = true;
+  el.addEventListener("paste", function (ev) {
+    var cd = ev.clipboardData;
+    if (!cd || !cd.items) return;
+    for (var i = 0; i < cd.items.length; i++) {
+      var it = cd.items[i];
+      if (it.type.indexOf("image") === -1) continue;
+      ev.preventDefault();
+      var blob = it.getAsFile();
+      if (!blob) continue;
+      var reader = new FileReader();
+      reader.onload = function () {
+        if (el.id === "previewEditor" || mduPreviewEditorActive()) {
+          mduInsertImageMarkdown(el, reader.result, "pasted image");
+        } else {
+          mduInsertImageMarkdown(mduGetSourceTextarea(), reader.result, "pasted image");
+        }
+      };
+      reader.readAsDataURL(blob);
+      return;
+    }
+  });
+}
+
+window.mduInitImagePaste = function () {
+  if (window._mduImagePasteInit) return;
+  window._mduImagePasteInit = true;
+  var bindAll = function () {
+    var ta = mduGetSourceTextarea();
+    if (ta) mduBindImagePaste(ta);
+    var pe = document.getElementById("previewEditor");
+    if (pe) mduBindImagePaste(pe);
+  };
+  bindAll();
+  window.addEventListener("mdu-view-changed", bindAll);
+  setTimeout(bindAll, 500);
+};
+
+window.mduInitPreviewEditor = function () {
+  if (window._mduPreviewEditorInit) return;
+  window._mduPreviewEditorInit = true;
+  var bind = function () {
+    var pe = document.getElementById("previewEditor");
+    if (!pe || pe._mduPreviewBound) return;
+    pe._mduPreviewBound = true;
+    mduBindImagePaste(pe);
+    var syncTimer = null;
+    var scheduleSync = function () {
+      if (syncTimer) clearTimeout(syncTimer);
+      syncTimer = setTimeout(function () {
+        window.mduSyncPreviewEditorToSource();
+        if (window.mduRenderMath) window.mduRenderMath("#previewEditor");
+      }, 120);
+    };
+    pe.addEventListener("input", scheduleSync);
+    pe.addEventListener("blur", function () {
+      window.mduSyncPreviewEditorToSource();
+    });
+  };
+  bind();
+  window.addEventListener("mdu-view-changed", bind);
+  setTimeout(bind, 400);
+};
+
+window.mduInitUiZoom = function () {
+  var shell = document.getElementById("appShell");
+  if (!shell || shell._mduZoomBound) return;
+  shell._mduZoomBound = true;
+  var key = "mdu_ui_zoom";
+  var z = 1;
+  try {
+    var saved = parseFloat(localStorage.getItem(key) || "1");
+    if (!isNaN(saved) && saved >= 0.5 && saved <= 2.5) z = saved;
+  } catch (e) {}
+  shell.style.zoom = String(z);
+  document.addEventListener(
+    "wheel",
+    function (ev) {
+      if (!ev.ctrlKey) return;
+      if (!shell.contains(ev.target)) return;
+      ev.preventDefault();
+      z = Math.max(0.5, Math.min(2.5, z + (ev.deltaY < 0 ? 0.06 : -0.06)));
+      shell.style.zoom = String(Math.round(z * 100) / 100);
+      try {
+        localStorage.setItem(key, String(shell.style.zoom));
+      } catch (e2) {}
+      window.dispatchEvent(
+        new CustomEvent("mdu-ui-zoom", { detail: parseFloat(shell.style.zoom) })
+      );
+    },
+    { passive: false }
+  );
 };

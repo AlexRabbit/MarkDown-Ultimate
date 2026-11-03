@@ -12,7 +12,7 @@ use wasm_bindgen_futures::JsFuture;
 use web_sys::{Blob, BlobPropertyBag, FileReader, RequestMode, Url};
 
 use crate::command_registry::{command_by_id, shortcut_lines, CommandKind, EditorCommand};
-use crate::editor_commands::{copy_text, find_replace, init_editor_shortcuts, jump_to_offset, print_markdown, sync_preview_layout};
+use crate::editor_commands::{copy_text, find_replace, init_editor_shortcuts, jump_to_offset, print_markdown};
 use crate::tools_sidebar::{
     load_tools_open, load_tools_width, run_command_on_editor, ToolsSidebar,
 };
@@ -21,6 +21,24 @@ const STORAGE_KEY: &str = "mdu_workspace_v1";
 const PULSE_KEY: &str = "mdu_howto_pulse_seen";
 const OUTLINE_HEIGHT_KEY: &str = "mdu_outline_height";
 const TOUR_STEPS: &str = include_str!("../tour/registry.json");
+
+const DEFAULT_WELCOME: &str = r#"# Welcome to MarkDown Ultimate
+
+**New here?** Open the **Preview** tab to write in a friendly document view (not raw code). Use **Tools** on the right for bold, lists, tables, and images.
+
+## Quick tips
+
+- **Ctrl + scroll wheel** — zoom the whole app (helpful on 4K monitors)
+- **Ctrl + V** — paste a screenshot or image from your clipboard
+- Select text in **Preview** or in the right pane of **Both** to copy it anywhere
+- **Markdown** shows the code; **Both** shows code and preview side by side
+
+## Images
+
+Open **Tools → Media → Insert image**, or paste an image with **Ctrl + V**.
+
+Happy writing!
+"#;
 
 fn load_outline_height() -> u32 {
     LocalStorage::get(OUTLINE_HEIGHT_KEY).unwrap_or(168)
@@ -38,6 +56,8 @@ extern "C" {
     fn mduRenderMath(selector: &str);
     #[wasm_bindgen(js_namespace = window, js_name = mduInitOutlineResize)]
     fn mdu_init_outline_resize(handle_id: &str, panel_id: &str, storage_key: &str);
+    #[wasm_bindgen(js_namespace = window, js_name = mduPreviewSetFromMarkdown)]
+    fn mdu_preview_set_from_markdown(md: &str, html: &str);
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -210,23 +230,23 @@ fn editor_body(
                         set_content.set(v.clone());
                         save(v);
                     }></textarea>
-                <div id="previewPane" class="preview" inner_html=move || render_markdown(&content.get())></div>
+                <div id="previewPane" class="preview preview-selectable" inner_html=move || render_markdown(&content.get())></div>
             </div>
         }.into_any(),
         ViewMode::Preview => view! {
             <div class="editor-surface preview-mode">
-                <div class="preview-mode-stack" id="previewModeStack">
-                    <div id="previewPane" class="preview preview-front" inner_html=move || render_markdown(&content.get())></div>
-                    <textarea id="mduSourceEditor" class="source preview-overlay" spellcheck="true"
-                        prop:value=move || content.get()
-                        on:input=move |ev| {
-                            let ta: web_sys::HtmlTextAreaElement = event_target(&ev);
-                            let v = ta.value();
-                            set_content.set(v.clone());
-                            save(v);
-                            schedule_preview_layout_sync();
-                        }></textarea>
+                <div class="preview-friendly-bar" data-tour-id="previewWriteHint">
+                    "Write here like a normal document — select text to copy. Toolbar tools work on your selection. Ctrl+scroll zooms the app. Ctrl+V pastes images."
                 </div>
+                <div id="previewEditor" class="preview preview-editable" contenteditable="true" role="textbox" aria-multiline="true" tabindex="0"></div>
+                <textarea id="mduSourceEditor" class="source mdu-source-hidden" spellcheck="true" aria-hidden="true" tabindex="-1"
+                    prop:value=move || content.get()
+                    on:input=move |ev| {
+                        let ta: web_sys::HtmlTextAreaElement = event_target(&ev);
+                        let v = ta.value();
+                        set_content.set(v.clone());
+                        save(v);
+                    }></textarea>
             </div>
         }.into_any(),
     }
@@ -304,7 +324,8 @@ pub fn App() -> impl IntoView {
             schedule_math_render();
         }
         if mode == ViewMode::Preview {
-            schedule_preview_layout_sync();
+            let html = render_markdown(&content.get());
+            mdu_preview_set_from_markdown(&content.get(), &html);
         }
     });
 
@@ -343,6 +364,25 @@ pub fn App() -> impl IntoView {
             persist.run(ws);
         }
     };
+
+    Effect::new({
+        let set_content = set_content;
+        let save_content = save_content;
+        move |_| {
+            let window = web_sys::window().unwrap();
+            let closure = Closure::wrap(Box::new(move |ev: web_sys::CustomEvent| {
+                if let Some(md) = ev.detail().as_string() {
+                    set_content.set(md.clone());
+                    save_content(md);
+                }
+            }) as Box<dyn FnMut(_)>);
+            let _ = window.add_event_listener_with_callback(
+                "mdu-markdown-changed",
+                closure.as_ref().unchecked_ref(),
+            );
+            closure.forget();
+        }
+    });
 
     let run_command_cb = {
         let save_content = save_content;
@@ -406,6 +446,11 @@ pub fn App() -> impl IntoView {
     let set_view = move |mode: ViewMode| {
         set_view_mode.set(mode);
         let _ = LocalStorage::set(VIEW_MODE_KEY, view_mode_storage(mode));
+        if let Some(w) = web_sys::window() {
+            if let Ok(ev) = web_sys::Event::new("mdu-view-changed") {
+                let _ = w.dispatch_event(&ev);
+            }
+        }
     };
 
     let start_tour = move |_| {
@@ -416,7 +461,7 @@ pub fn App() -> impl IntoView {
     };
 
     view! {
-        <div class="shell">
+        <div class="shell" id="appShell">
             <header class="topbar">
                 <div class="actions">
                     <button id="btnOpen" type="button" data-tour-id="btnOpen" on:click=move |_| set_modal.set(ModalKind::Import)>"Open"</button>
@@ -504,7 +549,7 @@ pub fn App() -> impl IntoView {
                     <div class="status-bar" id="docStatusBar" data-tour-id="docStatusBar">
                         {move || {
                             let (words, chars) = doc_stats(&content.get());
-                            format!("{words} words · {chars} characters · Ctrl+F find · Ctrl+/ shortcuts")
+                            format!("{words} words · {chars} characters · Ctrl+scroll zoom · Ctrl+F find · Ctrl+/ shortcuts")
                         }}
                     </div>
                 </section>
@@ -1062,7 +1107,10 @@ fn load_workspace() -> Workspace {
         .and_then(|s| serde_json::from_str(&s).ok())
         .unwrap_or_else(|| {
             let mut ws = Workspace::default();
-            ws.root.push(Node::new_file("Welcome.md"));
+            ws.root.push(Node::new_file_with_content(
+                "Welcome.md",
+                DEFAULT_WELCOME.to_string(),
+            ));
             ws
         })
 }
@@ -1150,26 +1198,11 @@ fn schedule_math_render() {
         None => return,
     };
     let closure = Closure::wrap(Box::new(move || {
-        mduRenderMath("#previewPane");
+        mduRenderMath("#previewPane,#previewEditor");
     }) as Box<dyn FnMut()>);
     let _ = window.set_timeout_with_callback_and_timeout_and_arguments_0(
         closure.as_ref().unchecked_ref(),
         30,
-    );
-    closure.forget();
-}
-
-fn schedule_preview_layout_sync() {
-    let window = match web_sys::window() {
-        Some(w) => w,
-        None => return,
-    };
-    let closure = Closure::wrap(Box::new(move || {
-        sync_preview_layout();
-    }) as Box<dyn FnMut()>);
-    let _ = window.set_timeout_with_callback_and_timeout_and_arguments_0(
-        closure.as_ref().unchecked_ref(),
-        40,
     );
     closure.forget();
 }

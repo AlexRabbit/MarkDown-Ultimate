@@ -72,6 +72,54 @@ body.mdu-resizing-outline { cursor: row-resize; user-select: none; }
   position: relative;
   min-height: 100%;
 }
+.preview-friendly-bar {
+  flex-shrink: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--muted);
+  padding: 0.55rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: #f8fafc;
+}
+.preview-editable {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 1.25rem 1.5rem;
+  font-size: 1.05rem;
+  line-height: 1.65;
+  user-select: text;
+  cursor: text;
+  outline: none;
+}
+.preview-editable:focus {
+  box-shadow: inset 0 0 0 2px rgba(99, 102, 241, 0.35);
+}
+.editor-surface.preview-mode {
+  display: flex;
+  flex-direction: column;
+}
+.editor-surface.split .preview,
+#previewPane.preview-selectable {
+  user-select: text;
+  cursor: text;
+}
+.mdu-source-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+#appShell {
+  zoom: var(--mdu-ui-zoom, 1);
+}
 .source {
   width: 100%; height: 100%; border: 0; padding: 1rem; resize: none;
   font-family: ui-monospace, monospace; font-size: .9rem; background: var(--panel);

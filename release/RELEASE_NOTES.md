@@ -1,3 +1,11 @@
+## v0.2.6
+
+- **UI zoom:** Ctrl + scroll wheel on the app shell (persists in `localStorage`; helpful on 4K)
+- **Preview mode:** contenteditable document view with a plain-language hint bar; tools apply to selection
+- **Images:** Tools → Media (insert, URL, clipboard); Ctrl+V paste into editor or Preview
+- **Selection:** copy text from Preview and from the split-pane preview (`user-select: text`)
+- **Welcome.md:** default noob-friendly guide for new workspaces
+
 ## v0.2.5
 
 - **Dependabot:** bump `base64` 0.23, `comrak` 0.58, `gloo-storage` 0.4, `leptos` 0.8 (comrak `Options` API)
