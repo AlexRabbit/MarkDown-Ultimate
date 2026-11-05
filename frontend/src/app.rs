@@ -17,6 +17,11 @@ use crate::editor_commands::{copy_text, find_replace, init_editor_shortcuts, jum
 use crate::tools_sidebar::{
     load_tools_open, load_tools_width, run_command_on_editor, ToolsSidebar,
 };
+use std::cell::Cell;
+
+thread_local! {
+    static APP_LISTENERS_INIT: Cell<bool> = const { Cell::new(false) };
+}
 
 const STORAGE_KEY: &str = "mdu_workspace_v1";
 const PULSE_KEY: &str = "mdu_howto_pulse_seen";
@@ -348,16 +353,18 @@ pub fn App() -> impl IntoView {
         mdu_apply_theme(t);
     });
 
-    Effect::new(move |_| {
-        let window = web_sys::window().unwrap();
-        let set_z = set_ui_zoom_pct;
-        let closure = Closure::wrap(Box::new(move |ev: web_sys::CustomEvent| {
-            if let Some(z) = ev.detail().as_f64() {
-                set_z.set(z.round() as u32);
-            }
-        }) as Box<dyn FnMut(_)>);
-        let _ = window.add_event_listener_with_callback("mdu-ui-zoom", closure.as_ref().unchecked_ref());
-        closure.forget();
+    Effect::new({
+        let set_ui_zoom_pct = set_ui_zoom_pct;
+        move |_| {
+            let window = web_sys::window().unwrap();
+            let closure = Closure::wrap(Box::new(move |ev: web_sys::CustomEvent| {
+                if let Some(z) = ev.detail().as_f64() {
+                    set_ui_zoom_pct.set(z.round() as u32);
+                }
+            }) as Box<dyn FnMut(_)>);
+            let _ = window.add_event_listener_with_callback("mdu-ui-zoom", closure.as_ref().unchecked_ref());
+            closure.forget();
+        }
     });
 
     Effect::new(move |_| {
@@ -477,6 +484,10 @@ pub fn App() -> impl IntoView {
         let save_content = save_content;
         let set_modal = set_modal;
         move |_| {
+            if APP_LISTENERS_INIT.with(|c| c.get()) {
+                return;
+            }
+            APP_LISTENERS_INIT.with(|c| c.set(true));
             init_editor_shortcuts();
             let window = web_sys::window().unwrap();
             let modal_closure = Closure::wrap(Box::new(move |ev: web_sys::CustomEvent| {

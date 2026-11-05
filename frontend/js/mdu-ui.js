@@ -660,7 +660,10 @@ window.mduInitUiZoom = function () {
     var saved = parseFloat(localStorage.getItem(key) || "1");
     if (!isNaN(saved) && saved >= 0.5 && saved <= 2.5) z = saved;
   } catch (e) {}
-  target.style.zoom = String(z);
+  target.style.zoom = "";
+  var shell = document.getElementById("appShell");
+  if (shell) shell.style.zoom = "";
+  target.style.setProperty("--mdu-ui-zoom", String(z));
   window.dispatchEvent(new CustomEvent("mdu-ui-zoom", { detail: z }));
   document.addEventListener(
     "wheel",
@@ -670,7 +673,7 @@ window.mduInitUiZoom = function () {
       ev.preventDefault();
       z = Math.max(0.5, Math.min(2.5, z + (ev.deltaY < 0 ? 0.06 : -0.06)));
       z = Math.round(z * 100) / 100;
-      target.style.zoom = String(z);
+      target.style.setProperty("--mdu-ui-zoom", String(z));
       try {
         localStorage.setItem(key, String(z));
       } catch (e2) {}
@@ -683,7 +686,8 @@ window.mduInitUiZoom = function () {
 window.mduResetUiZoom = function () {
   var target = document.getElementById("mduZoomTarget");
   if (!target) return;
-  target.style.zoom = "1";
+  target.style.zoom = "";
+  target.style.setProperty("--mdu-ui-zoom", "1");
   try {
     localStorage.setItem("mdu_ui_zoom", "1");
   } catch (e) {}
@@ -742,11 +746,6 @@ window.mduInitMobileLayout = function () {
       document.documentElement.classList.contains("mdu-mobile-ready");
     document.body.classList.toggle("mdu-mobile", mobile);
     if (mobile) {
-      document.body.classList.add("mdu-mobile-closed-panels");
-      var main = document.querySelector(".main");
-      if (main && !main.classList.contains("main-docs-closed")) {
-        main.classList.add("main-docs-closed");
-      }
       var split = document.getElementById("splitEditorSurface");
       if (split && !split.classList.contains("show-source") && !split.classList.contains("show-preview")) {
         split.classList.add("show-preview");
