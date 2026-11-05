@@ -66,8 +66,14 @@ extern "C" {
     fn mdu_preview_set_from_markdown(md: &str, html: &str);
     #[wasm_bindgen(js_namespace = window, js_name = mduSplitPreviewSetFromMarkdown)]
     fn mdu_split_preview_set_from_markdown(md: &str, html: &str);
+    #[wasm_bindgen(js_namespace = window, js_name = mduHydrateSplitView)]
+    fn mdu_hydrate_split_view(md: &str, html: &str);
     #[wasm_bindgen(js_namespace = window, js_name = mduSetSourceEditorValue)]
     fn mdu_set_source_editor_value(md: &str);
+    #[wasm_bindgen(js_namespace = window, js_name = mduInitSplitScrollSync)]
+    fn mdu_init_split_scroll_sync();
+    #[wasm_bindgen(js_namespace = window, js_name = mduInitSplitPreviewEditor)]
+    fn mdu_init_split_preview_editor();
     #[wasm_bindgen(js_namespace = window, js_name = mduApplyTheme)]
     fn mdu_apply_theme(theme: &str);
     #[wasm_bindgen(js_namespace = window, js_name = mduResetUiZoom)]
@@ -280,14 +286,16 @@ fn editor_body(
                     <button type="button" class="mobile-split-btn active" data-mobile-split="source">"Code"</button>
                     <button type="button" class="mobile-split-btn" data-mobile-split="preview">"Preview"</button>
                 </div>
-                <textarea id="mduSourceEditor" class="source inline" spellcheck="true"
-                    on:input=move |ev| {
-                        let ta: web_sys::HtmlTextAreaElement = event_target(&ev);
-                        let v = ta.value();
-                        set_content.set(v.clone());
-                        save(v);
-                    }></textarea>
-                <div id="previewPane" class="preview preview-selectable preview-editable-split" contenteditable="true" tabindex="0" role="textbox" aria-multiline="true"></div>
+                <div class="split-editor-panes">
+                    <textarea id="mduSourceEditor" class="source inline" spellcheck="true"
+                        on:input=move |ev| {
+                            let ta: web_sys::HtmlTextAreaElement = event_target(&ev);
+                            let v = ta.value();
+                            set_content.set(v.clone());
+                            save(v);
+                        }></textarea>
+                    <div id="previewPane" class="preview preview-selectable preview-editable-split" contenteditable="true" tabindex="0" role="textbox" aria-multiline="true"></div>
+                </div>
             </div>
         }.into_any(),
         ViewMode::Preview => view! {
@@ -360,7 +368,7 @@ pub fn App() -> impl IntoView {
             let window = web_sys::window().unwrap();
             let closure = Closure::wrap(Box::new(move |ev: web_sys::CustomEvent| {
                 if let Some(z) = ev.detail().as_f64() {
-                    set_ui_zoom_pct.set(z.round() as u32);
+                    set_ui_zoom_pct.set((z * 100.0).round() as u32);
                 }
             }) as Box<dyn FnMut(_)>);
             let _ = window.add_event_listener_with_callback("mdu-ui-zoom", closure.as_ref().unchecked_ref());
@@ -405,6 +413,17 @@ pub fn App() -> impl IntoView {
         let ws = workspace.get_untracked();
         if let Some(c) = find_content(&ws, &id) {
             set_content.set(c.clone());
+            mdu_set_source_editor_value(&c);
+        }
+    });
+
+    Effect::new(move || {
+        let mode = view_mode.get();
+        let c = content.get_untracked();
+        if mode == ViewMode::Split {
+            let html = render_markdown(&c);
+            mdu_hydrate_split_view(&c, &html);
+        } else {
             mdu_set_source_editor_value(&c);
         }
     });
@@ -1323,6 +1342,22 @@ fn schedule_pulse_stop(set_show_pulse: WriteSignal<bool>) {
     let _ = window.set_timeout_with_callback_and_timeout_and_arguments_0(
         closure.as_ref().unchecked_ref(),
         60_000,
+    );
+    closure.forget();
+}
+
+fn schedule_split_scroll_init() {
+    let window = match web_sys::window() {
+        Some(w) => w,
+        None => return,
+    };
+    let closure = Closure::wrap(Box::new(move || {
+        mdu_init_split_scroll_sync();
+        mdu_init_split_preview_editor();
+    }) as Box<dyn FnMut()>);
+    let _ = window.set_timeout_with_callback_and_timeout_and_arguments_0(
+        closure.as_ref().unchecked_ref(),
+        60,
     );
     closure.forget();
 }

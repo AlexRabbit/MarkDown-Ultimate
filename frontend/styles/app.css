@@ -110,6 +110,25 @@ body { background: var(--bg); color: var(--text); }
   background: linear-gradient(180deg, transparent, var(--border) 45%, transparent);
   border-radius: 4px;
 }
+.editor-surface.split {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.split-editor-panes {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-width: 0;
+}
+.split-editor-panes .source.inline {
+  border-right: 1px solid var(--border);
+  min-width: 0;
+  color: var(--text);
+  background: var(--panel);
+}
 .editor-surface.split .source.inline,
 .editor-surface.split #previewPane {
   padding: 1rem;
@@ -117,6 +136,7 @@ body { background: var(--bg); color: var(--text); }
   box-sizing: border-box;
   overflow: auto;
   min-height: 0;
+  height: 100%;
 }
 .preview-editable-split {
   user-select: text;
@@ -147,7 +167,6 @@ body.mdu-resizing-outline { cursor: row-resize; user-select: none; }
 .editor-row { flex: 1; display: flex; min-height: 0; position: relative; }
 .editor { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
 .editor-surface { flex: 1; min-height: 0; min-width: 0; }
-.editor-surface.split { display: grid; grid-template-columns: 1fr 1fr; height: 100%; }
 .editor-surface.preview-mode {
   position: relative;
   height: 100%;
@@ -211,6 +230,7 @@ body.mdu-resizing-outline { cursor: row-resize; user-select: none; }
 .source {
   width: 100%; height: 100%; border: 0; padding: 1rem; resize: none;
   font-family: ui-monospace, monospace; font-size: .9rem; background: var(--panel);
+  color: var(--text);
 }
 .source.preview-overlay {
   position: absolute;
@@ -359,10 +379,11 @@ body.mdu-mobile .tools-sidebar {
   box-shadow: -4px 0 24px rgba(0, 0, 0, 0.2);
 }
 body.mdu-mobile .tools-resize { display: none; }
-body.mdu-mobile .editor-surface.split {
+body.mdu-mobile .editor-surface.split .split-editor-panes {
   display: flex;
   flex-direction: column;
-  grid-template-columns: unset;
+  flex: 1;
+  min-height: 0;
 }
 body.mdu-mobile .mobile-split-bar {
   display: flex;
@@ -417,7 +438,10 @@ body.mdu-mobile .actions button { padding: .4rem .65rem; font-size: .82rem; }
 .ctx-menu button:hover { background: var(--hover-bg); }
 .modal-wide { min-width: min(720px, 92vw); max-height: 80vh; }
 .diag-log { max-height: 50vh; overflow: auto; font-size: .72rem; background: var(--diag-bg); color: var(--diag-fg); padding: .75rem; border-radius: .5rem; }
-.mobile-split-bar { display: none; }
+.mobile-split-bar {
+  display: none;
+  flex-shrink: 0;
+}
 .mdu-driver-popover { font-family: inherit; }
 .preview .tg-spoiler { background: #444; color: #444; border-radius: .2rem; }
 .preview .tg-spoiler:hover { color: inherit; }

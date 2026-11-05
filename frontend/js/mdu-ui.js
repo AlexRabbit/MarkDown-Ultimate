@@ -185,6 +185,11 @@ window.mduSplitPreviewSetFromMarkdown = function (md, html) {
   var pane = document.getElementById("previewPane");
   var ta = mduGetSourceTextarea();
   if (!pane || !ta) return;
+  md = md || "";
+  html = html || "";
+  if (document.activeElement !== ta && ta.value !== md) {
+    ta.value = md;
+  }
   if (document.activeElement === pane || pane.contains(document.activeElement)) return;
   var ratio = 0;
   if (pane.scrollHeight > pane.clientHeight) {
@@ -198,11 +203,26 @@ window.mduSplitPreviewSetFromMarkdown = function (md, html) {
   }
 };
 
+window.mduHydrateSplitView = function (md, html) {
+  window._mduLastSplitMd = md || "";
+  var run = function () {
+    window.mduSetSourceEditorValue(md || "");
+    window.mduSplitPreviewSetFromMarkdown(md || "", html || "");
+    if (window.mduInitSplitScrollSync) window.mduInitSplitScrollSync();
+    if (window.mduInitSplitPreviewEditor) window.mduInitSplitPreviewEditor();
+  };
+  requestAnimationFrame(function () {
+    setTimeout(run, 0);
+  });
+};
+
 window.mduSetSourceEditorValue = function (md) {
   var ta = mduGetSourceTextarea();
   if (!ta) return;
-  if (document.activeElement === ta) return;
-  ta.value = md || "";
+  md = md || "";
+  if (ta.value === md) return;
+  if (document.activeElement === ta && ta.value.length > 0) return;
+  ta.value = md;
 };
 
 function mduApplyPreviewCommand(before, after, placeholder) {
@@ -830,10 +850,7 @@ window.mduInitMobileLayout = function () {
   if (window._mduMobileInit) return;
   window._mduMobileInit = true;
   function applyMobile() {
-    var mobile =
-      window.matchMedia("(max-width: 768px)").matches ||
-      /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent || "") ||
-      document.documentElement.classList.contains("mdu-mobile-ready");
+    var mobile = window.matchMedia("(max-width: 768px)").matches;
     document.body.classList.toggle("mdu-mobile", mobile);
     if (mobile) {
       var split = document.getElementById("splitEditorSurface");
