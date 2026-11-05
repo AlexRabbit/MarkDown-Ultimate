@@ -11,6 +11,7 @@
 .cursor/
 aimemos/
 apps/target/
+apps/android/assets/web/
 code/diagnostics/logs/
 *.pdb
 release/*

@@ -4,7 +4,8 @@
 - **Top bar:** active document title; Diagnostics left of How to Use; **Theme** toggle (Light / Night / Gold via CSS variables)
 - **Both mode:** linked scroll between source and preview
 - **Zoom:** applies to editor column only (outline stays visible); live **Zoom %** + **Reset zoom**
-- **Mobile / APK:** overlay sidebars, split Code/Preview tabs; CI syncs `dist` → Android assets
+- **Mobile / APK:** overlay sidebars, split Code/Preview tabs; bundled `dist` in APK assets; CI syncs `dist` → Android assets
+- **APK v0.2.7 (207):** loads `file:///android_asset/web/index.html` with mobile boot (closed Docs/Tools, default Preview)
 - **Release:** `QTestings\prepare-github-public.ps1` for manual upload folder
 
 ## v0.2.6

@@ -13,8 +13,8 @@ publisher = "AlexRabbit"
 identifier = "com.alexrabbit.markdownultimate"
 min_sdk = 21
 target_sdk = 34
-version_name = "0.2.5"
-version_code = 205
+version_name = "0.2.7"
+version_code = 207
 
 [android.permissions."android.permission.INTERNET"]
-description = "Load the MarkDown Ultimate web app from GitHub Pages"
+description = "Optional CDN scripts (KaTeX, Driver.js) when bundled app loads external resources"

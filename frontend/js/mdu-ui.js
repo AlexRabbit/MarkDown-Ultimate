@@ -738,8 +738,20 @@ window.mduInitMobileLayout = function () {
   function applyMobile() {
     var mobile =
       window.matchMedia("(max-width: 768px)").matches ||
-      /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent || "");
+      /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent || "") ||
+      document.documentElement.classList.contains("mdu-mobile-ready");
     document.body.classList.toggle("mdu-mobile", mobile);
+    if (mobile) {
+      document.body.classList.add("mdu-mobile-closed-panels");
+      var main = document.querySelector(".main");
+      if (main && !main.classList.contains("main-docs-closed")) {
+        main.classList.add("main-docs-closed");
+      }
+      var split = document.getElementById("splitEditorSurface");
+      if (split && !split.classList.contains("show-source") && !split.classList.contains("show-preview")) {
+        split.classList.add("show-preview");
+      }
+    }
   }
   applyMobile();
   window.addEventListener("resize", applyMobile);

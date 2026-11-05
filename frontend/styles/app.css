@@ -378,6 +378,9 @@ body.mdu-mobile .doc-title { max-width: 38vw; font-size: .78rem; }
 body.mdu-mobile .topbar-secondary { padding: .35rem .5rem; font-size: .75rem; }
 body.mdu-mobile #btnTheme { display: none; }
 body.mdu-mobile .view-pill { margin: .35rem auto; transform: scale(0.95); }
+body.mdu-mobile .editor-pane { padding-bottom: env(safe-area-inset-bottom, 0); }
+body.mdu-mobile .topbar { padding: .5rem .65rem; flex-wrap: wrap; gap: .35rem; }
+body.mdu-mobile .actions button { padding: .4rem .65rem; font-size: .82rem; }
 
 .folder-block { list-style: none; margin: 0; padding-left: .65rem; }
 .folder-children.collapsed { display: none; }
