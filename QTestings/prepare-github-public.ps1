@@ -9,7 +9,8 @@ New-Item -ItemType Directory -Force -Path $out | Out-Null
 
 $exclude = @(
     ".git", "target", "apps\target", "frontend\target", "tools\mdu-launcher\target",
-    "release\github-public", "python", "code\diagnostics\logs", "*.exe"
+    "release\github-public", "python", "code\diagnostics\logs",
+    "MarkDownUltimate.exe.WebView2", "MarkDownUltimate.exe"
 )
 
 function Should-Skip($rel) {
@@ -18,6 +19,7 @@ function Should-Skip($rel) {
     }
     if ($rel -match "\\target\\") { return $true }
     if ($rel -match "\\\.env") { return $true }
+    if ($rel -like "MarkDownUltimate.exe*") { return $true }
     return $false
 }
 
