@@ -64,6 +64,10 @@ extern "C" {
     fn mdu_init_outline_resize(handle_id: &str, panel_id: &str, storage_key: &str);
     #[wasm_bindgen(js_namespace = window, js_name = mduPreviewSetFromMarkdown)]
     fn mdu_preview_set_from_markdown(md: &str, html: &str);
+    #[wasm_bindgen(js_namespace = window, js_name = mduSplitPreviewSetFromMarkdown)]
+    fn mdu_split_preview_set_from_markdown(md: &str, html: &str);
+    #[wasm_bindgen(js_namespace = window, js_name = mduSetSourceEditorValue)]
+    fn mdu_set_source_editor_value(md: &str);
     #[wasm_bindgen(js_namespace = window, js_name = mduApplyTheme)]
     fn mdu_apply_theme(theme: &str);
     #[wasm_bindgen(js_namespace = window, js_name = mduResetUiZoom)]
@@ -262,7 +266,6 @@ fn editor_body(
         ViewMode::Markdown => view! {
             <div class="editor-surface source-only">
                 <textarea id="mduSourceEditor" class="source" spellcheck="true"
-                    prop:value=move || content.get()
                     on:input=move |ev| {
                         let ta: web_sys::HtmlTextAreaElement = event_target(&ev);
                         let v = ta.value();
@@ -278,14 +281,13 @@ fn editor_body(
                     <button type="button" class="mobile-split-btn" data-mobile-split="preview">"Preview"</button>
                 </div>
                 <textarea id="mduSourceEditor" class="source inline" spellcheck="true"
-                    prop:value=move || content.get()
                     on:input=move |ev| {
                         let ta: web_sys::HtmlTextAreaElement = event_target(&ev);
                         let v = ta.value();
                         set_content.set(v.clone());
                         save(v);
                     }></textarea>
-                <div id="previewPane" class="preview preview-selectable" inner_html=move || render_markdown(&content.get())></div>
+                <div id="previewPane" class="preview preview-selectable preview-editable-split" contenteditable="true" tabindex="0" role="textbox" aria-multiline="true"></div>
             </div>
         }.into_any(),
         ViewMode::Preview => view! {
@@ -295,7 +297,6 @@ fn editor_body(
                 </div>
                 <div id="previewEditor" class="preview preview-editable" contenteditable="true" role="textbox" aria-multiline="true" tabindex="0"></div>
                 <textarea id="mduSourceEditor" class="source mdu-source-hidden" spellcheck="true" aria-hidden="true" tabindex="-1"
-                    prop:value=move || content.get()
                     on:input=move |ev| {
                         let ta: web_sys::HtmlTextAreaElement = event_target(&ev);
                         let v = ta.value();
@@ -382,6 +383,13 @@ pub fn App() -> impl IntoView {
         closure.forget();
     });
 
+    Effect::new(move || {
+        if !docs_open.get() {
+            return;
+        }
+        schedule_outline_resize_init();
+    });
+
     if show_pulse.get_untracked() && !LocalStorage::get::<bool>(PULSE_KEY).unwrap_or(false) {
         schedule_pulse_stop(set_show_pulse);
     }
@@ -393,8 +401,11 @@ pub fn App() -> impl IntoView {
     });
 
     Effect::new(move || {
-        if let Some(c) = find_content(&workspace.get(), &active_id.get()) {
-            set_content.set(c);
+        let id = active_id.get();
+        let ws = workspace.get_untracked();
+        if let Some(c) = find_content(&ws, &id) {
+            set_content.set(c.clone());
+            mdu_set_source_editor_value(&c);
         }
     });
 
@@ -407,6 +418,10 @@ pub fn App() -> impl IntoView {
         if mode == ViewMode::Preview {
             let html = render_markdown(&content.get());
             mdu_preview_set_from_markdown(&content.get(), &html);
+        }
+        if mode == ViewMode::Split {
+            let html = render_markdown(&content.get());
+            mdu_split_preview_set_from_markdown(&content.get(), &html);
         }
     });
 
@@ -1308,6 +1323,21 @@ fn schedule_pulse_stop(set_show_pulse: WriteSignal<bool>) {
     let _ = window.set_timeout_with_callback_and_timeout_and_arguments_0(
         closure.as_ref().unchecked_ref(),
         60_000,
+    );
+    closure.forget();
+}
+
+fn schedule_outline_resize_init() {
+    let window = match web_sys::window() {
+        Some(w) => w,
+        None => return,
+    };
+    let closure = Closure::wrap(Box::new(move || {
+        mdu_init_outline_resize("outlineResizeHandle", "docOutline", OUTLINE_HEIGHT_KEY);
+    }) as Box<dyn FnMut()>);
+    let _ = window.set_timeout_with_callback_and_timeout_and_arguments_0(
+        closure.as_ref().unchecked_ref(),
+        50,
     );
     closure.forget();
 }

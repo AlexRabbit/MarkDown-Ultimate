@@ -55,7 +55,7 @@
 html, body { height: 100%; margin: 0; }
 body { background: var(--bg); color: var(--text); }
 
-.shell { height: 100vh; min-height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+.shell { height: 100vh; min-height: 100vh; display: flex; flex-direction: column; overflow: hidden; --mdu-ui-zoom: 1; font-size: calc(1rem * var(--mdu-ui-zoom, 1)); }
 .topbar {
   display: flex; justify-content: space-between; align-items: center; gap: .75rem;
   padding: .75rem 1rem; border-bottom: 1px solid var(--border); background: var(--panel);
@@ -79,8 +79,6 @@ body { background: var(--bg); color: var(--text); }
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  --mdu-ui-zoom: 1;
-  font-size: calc(1rem * var(--mdu-ui-zoom, 1));
 }
 .docs-toggle {
   position: absolute; left: 0; top: 50%; transform: translateY(-50%); z-index: 5;
@@ -103,12 +101,30 @@ body { background: var(--bg); color: var(--text); }
 .outline-panel { border-top: 1px solid var(--border); margin-top: 0; padding-top: 0; flex: 0 0 auto; display: flex; flex-direction: column; min-height: 4.5rem; max-height: 55vh; overflow: hidden; }
 .outline-resize-handle {
   flex-shrink: 0;
-  height: 7px;
+  height: 12px;
   margin-top: .35rem;
   cursor: row-resize;
   touch-action: none;
+  position: relative;
+  z-index: 3;
   background: linear-gradient(180deg, transparent, var(--border) 45%, transparent);
   border-radius: 4px;
+}
+.editor-surface.split .source.inline,
+.editor-surface.split #previewPane {
+  padding: 1rem;
+  line-height: 1.65;
+  box-sizing: border-box;
+  overflow: auto;
+  min-height: 0;
+}
+.preview-editable-split {
+  user-select: text;
+  cursor: text;
+  outline: none;
+}
+.preview-editable-split:focus {
+  box-shadow: inset 0 0 0 2px rgba(99, 102, 241, 0.25);
 }
 body.mdu-resizing-outline { cursor: row-resize; user-select: none; }
 .outline-list-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; padding: 0 .15rem .25rem; }

@@ -39,6 +39,8 @@ extern "C" {
     fn mdu_init_image_paste();
     #[wasm_bindgen(js_namespace = window, js_name = mduInitSplitScrollSync)]
     fn mdu_init_split_scroll_sync();
+    #[wasm_bindgen(js_namespace = window, js_name = mduInitSplitPreviewEditor)]
+    fn mdu_init_split_preview_editor();
     #[wasm_bindgen(js_namespace = window, js_name = mduInitMobileLayout)]
     fn mdu_init_mobile_layout();
 }
@@ -55,6 +57,7 @@ pub fn init_editor_shortcuts() {
     mdu_init_preview_editor();
     mdu_init_image_paste();
     mdu_init_split_scroll_sync();
+    mdu_init_split_preview_editor();
     mdu_init_mobile_layout();
 }
 

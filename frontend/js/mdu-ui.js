@@ -51,9 +51,21 @@ function mduGetSourceTextarea() {
 
 function mduPreviewEditorActive() {
   var pe = document.getElementById("previewEditor");
-  if (!pe) return false;
+  var sp = document.getElementById("previewPane");
+  if (!pe && !sp) return false;
   var ae = document.activeElement;
-  return ae === pe || (ae && pe.contains(ae));
+  if (pe && (ae === pe || (ae && pe.contains(ae)))) return true;
+  if (sp && sp.getAttribute("contenteditable") === "true" && (ae === sp || (ae && sp.contains(ae)))) return true;
+  return false;
+}
+
+function mduActivePreviewEl() {
+  var pe = document.getElementById("previewEditor");
+  var sp = document.getElementById("previewPane");
+  var ae = document.activeElement;
+  if (pe && (ae === pe || (ae && pe.contains(ae)))) return pe;
+  if (sp && (ae === sp || (ae && sp.contains(ae)))) return sp;
+  return pe || sp;
 }
 
 function mduInsertAtTextarea(el, text, selectLen) {
@@ -144,11 +156,16 @@ window.mduHtmlToMarkdown = function (rootEl) {
 
 window.mduSyncPreviewEditorToSource = function () {
   var pe = document.getElementById("previewEditor");
+  var sp = document.getElementById("previewPane");
+  var root = null;
+  if (pe && (document.activeElement === pe || pe.contains(document.activeElement))) root = pe;
+  else if (sp && (document.activeElement === sp || sp.contains(document.activeElement))) root = sp;
+  else root = pe || sp;
   var ta = mduGetSourceTextarea();
-  if (!pe || !ta) return null;
-  var md = window.mduHtmlToMarkdown(pe);
+  if (!root || !ta) return null;
+  var md = window.mduHtmlToMarkdown(root);
   ta.value = md;
-  window.dispatchEvent(new CustomEvent("mdu-markdown-changed", { detail: md }));
+  ta.dispatchEvent(new Event("input", { bubbles: true }));
   return md;
 };
 
@@ -156,7 +173,6 @@ window.mduPreviewSetFromMarkdown = function (md, html) {
   var pe = document.getElementById("previewEditor");
   var ta = mduGetSourceTextarea();
   if (!pe || !ta) return;
-  if (pe._mduSkipExternalSet) return;
   if (document.activeElement === pe || pe.contains(document.activeElement)) return;
   ta.value = md;
   if (pe.innerHTML !== html) {
@@ -165,8 +181,32 @@ window.mduPreviewSetFromMarkdown = function (md, html) {
   }
 };
 
+window.mduSplitPreviewSetFromMarkdown = function (md, html) {
+  var pane = document.getElementById("previewPane");
+  var ta = mduGetSourceTextarea();
+  if (!pane || !ta) return;
+  if (document.activeElement === pane || pane.contains(document.activeElement)) return;
+  var ratio = 0;
+  if (pane.scrollHeight > pane.clientHeight) {
+    ratio = pane.scrollTop / Math.max(1, pane.scrollHeight - pane.clientHeight);
+  }
+  if (pane.innerHTML !== html) {
+    pane.innerHTML = html;
+    if (window.mduRenderMath) window.mduRenderMath("#previewPane");
+    pane.scrollTop = ratio * Math.max(0, pane.scrollHeight - pane.clientHeight);
+    if (window.mduSyncSplitScrollFromSource) window.mduSyncSplitScrollFromSource();
+  }
+};
+
+window.mduSetSourceEditorValue = function (md) {
+  var ta = mduGetSourceTextarea();
+  if (!ta) return;
+  if (document.activeElement === ta) return;
+  ta.value = md || "";
+};
+
 function mduApplyPreviewCommand(before, after, placeholder) {
-  var pe = document.getElementById("previewEditor");
+  var pe = mduActivePreviewEl();
   if (!pe) return null;
   pe.focus();
   var sel = window.getSelection();
@@ -401,25 +441,27 @@ window.mduSyncPreviewLayout = function () {
 window.mduInitOutlineResize = function (handleId, panelId, storageKey) {
   var handle = document.getElementById(handleId);
   var panel = document.getElementById(panelId);
-  if (!handle || !panel || handle._mduOutlineBound) return;
+  if (!handle || !panel) return;
+  if (handle._mduOutlineBound) return;
   handle._mduOutlineBound = true;
   var dragging = false;
   var startY = 0;
   var startH = 0;
-  handle.addEventListener("mousedown", function (ev) {
+  function onDown(ev) {
     dragging = true;
-    startY = ev.clientY;
+    startY = ev.clientY != null ? ev.clientY : ev.touches && ev.touches[0] ? ev.touches[0].clientY : 0;
     startH = panel.getBoundingClientRect().height;
     ev.preventDefault();
     document.body.classList.add("mdu-resizing-outline");
-  });
-  window.addEventListener("mousemove", function (ev) {
+  }
+  function onMove(ev) {
     if (!dragging) return;
-    var delta = startY - ev.clientY;
+    var y = ev.clientY != null ? ev.clientY : ev.touches && ev.touches[0] ? ev.touches[0].clientY : startY;
+    var delta = startY - y;
     var next = Math.max(72, Math.min(window.innerHeight * 0.55, startH + delta));
     panel.style.height = next + "px";
-  });
-  window.addEventListener("mouseup", function () {
+  }
+  function onUp() {
     if (!dragging) return;
     dragging = false;
     document.body.classList.remove("mdu-resizing-outline");
@@ -430,7 +472,13 @@ window.mduInitOutlineResize = function (handleId, panelId, storageKey) {
     window.dispatchEvent(
       new CustomEvent("mdu-outline-height", { detail: Math.round(h) })
     );
-  });
+  }
+  handle.addEventListener("mousedown", onDown);
+  handle.addEventListener("touchstart", onDown, { passive: false });
+  window.addEventListener("mousemove", onMove);
+  window.addEventListener("touchmove", onMove, { passive: false });
+  window.addEventListener("mouseup", onUp);
+  window.addEventListener("touchend", onUp);
 };
 
 function mduLineAt(text, pos) {
@@ -651,29 +699,27 @@ window.mduInitPreviewEditor = function () {
 };
 
 window.mduInitUiZoom = function () {
-  var target = document.getElementById("mduZoomTarget");
-  if (!target || target._mduZoomBound) return;
-  target._mduZoomBound = true;
+  var shell = document.getElementById("appShell");
+  if (!shell || shell._mduZoomBound) return;
+  shell._mduZoomBound = true;
   var key = "mdu_ui_zoom";
   var z = 1;
   try {
     var saved = parseFloat(localStorage.getItem(key) || "1");
     if (!isNaN(saved) && saved >= 0.5 && saved <= 2.5) z = saved;
   } catch (e) {}
-  target.style.zoom = "";
-  var shell = document.getElementById("appShell");
-  if (shell) shell.style.zoom = "";
-  target.style.setProperty("--mdu-ui-zoom", String(z));
+  shell.style.zoom = "";
+  shell.style.setProperty("--mdu-ui-zoom", String(z));
   window.dispatchEvent(new CustomEvent("mdu-ui-zoom", { detail: z }));
   document.addEventListener(
     "wheel",
     function (ev) {
       if (!ev.ctrlKey) return;
-      if (!target.contains(ev.target)) return;
+      if (!shell.contains(ev.target)) return;
       ev.preventDefault();
       z = Math.max(0.5, Math.min(2.5, z + (ev.deltaY < 0 ? 0.06 : -0.06)));
       z = Math.round(z * 100) / 100;
-      target.style.setProperty("--mdu-ui-zoom", String(z));
+      shell.style.setProperty("--mdu-ui-zoom", String(z));
       try {
         localStorage.setItem(key, String(z));
       } catch (e2) {}
@@ -684,10 +730,10 @@ window.mduInitUiZoom = function () {
 };
 
 window.mduResetUiZoom = function () {
-  var target = document.getElementById("mduZoomTarget");
-  if (!target) return;
-  target.style.zoom = "";
-  target.style.setProperty("--mdu-ui-zoom", "1");
+  var shell = document.getElementById("appShell");
+  if (!shell) return;
+  shell.style.zoom = "";
+  shell.style.setProperty("--mdu-ui-zoom", "1");
   try {
     localStorage.setItem("mdu_ui_zoom", "1");
   } catch (e) {}
@@ -702,12 +748,23 @@ window.mduApplyTheme = function (theme) {
   } catch (e) {}
 };
 
+window.mduSyncSplitScrollFromSource = function () {
+  var ta = document.getElementById("mduSourceEditor");
+  var prev = document.getElementById("previewPane");
+  if (!ta || !prev) return;
+  var maxFrom = Math.max(1, ta.scrollHeight - ta.clientHeight);
+  var ratio = ta.scrollTop / maxFrom;
+  var maxTo = Math.max(0, prev.scrollHeight - prev.clientHeight);
+  prev.scrollTop = ratio * maxTo;
+};
+
 window.mduInitSplitScrollSync = function () {
   var bind = function () {
     var surface = document.getElementById("splitEditorSurface");
     var ta = document.getElementById("mduSourceEditor");
     var prev = document.getElementById("previewPane");
-    if (!surface || !ta || !prev || ta._mduSplitSyncBound) return;
+    if (!surface || !ta || !prev) return;
+    if (ta._mduSplitSyncBound) return;
     if (!surface.classList.contains("split")) return;
     ta._mduSplitSyncBound = true;
     var syncing = false;
@@ -726,14 +783,47 @@ window.mduInitSplitScrollSync = function () {
     prev.addEventListener("scroll", function () {
       sync(prev, ta);
     });
+    ta.addEventListener("input", function () {
+      setTimeout(function () {
+        window.mduSyncSplitScrollFromSource();
+      }, 30);
+    });
   };
   bind();
   window.addEventListener("mdu-view-changed", function () {
     var ta = document.getElementById("mduSourceEditor");
     if (ta) ta._mduSplitSyncBound = false;
-    bind();
+    setTimeout(bind, 120);
   });
   setTimeout(bind, 200);
+};
+
+window.mduInitSplitPreviewEditor = function () {
+  var bind = function () {
+    var pane = document.getElementById("previewPane");
+    if (!pane || pane.getAttribute("contenteditable") !== "true" || pane._mduSplitPreviewBound) return;
+    pane._mduSplitPreviewBound = true;
+    mduBindImagePaste(pane);
+    var syncTimer = null;
+    var scheduleSync = function () {
+      if (syncTimer) clearTimeout(syncTimer);
+      syncTimer = setTimeout(function () {
+        window.mduSyncPreviewEditorToSource();
+        if (window.mduRenderMath) window.mduRenderMath("#previewPane");
+      }, 100);
+    };
+    pane.addEventListener("input", scheduleSync);
+    pane.addEventListener("blur", function () {
+      window.mduSyncPreviewEditorToSource();
+    });
+  };
+  bind();
+  window.addEventListener("mdu-view-changed", function () {
+    var pane = document.getElementById("previewPane");
+    if (pane) pane._mduSplitPreviewBound = false;
+    setTimeout(bind, 150);
+  });
+  setTimeout(bind, 250);
 };
 
 window.mduInitMobileLayout = function () {
