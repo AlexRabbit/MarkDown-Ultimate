@@ -1,3 +1,12 @@
+## v0.2.7
+
+- **Files panel:** hover tooltip (full name); **←** close + **Docs ⟩** reopen; **📁** new folder icon
+- **Top bar:** active document title; Diagnostics left of How to Use; **Theme** toggle (Light / Night / Gold via CSS variables)
+- **Both mode:** linked scroll between source and preview
+- **Zoom:** applies to editor column only (outline stays visible); live **Zoom %** + **Reset zoom**
+- **Mobile / APK:** overlay sidebars, split Code/Preview tabs; CI syncs `dist` → Android assets
+- **Release:** `QTestings\prepare-github-public.ps1` for manual upload folder
+
 ## v0.2.6
 
 - **UI zoom:** Ctrl + scroll wheel on the app shell (persists in `localStorage`; helpful on 4K)

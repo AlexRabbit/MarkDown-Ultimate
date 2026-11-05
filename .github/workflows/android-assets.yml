@@ -1,0 +1,30 @@
+name: Sync Android web assets
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "frontend/**"
+      - "dist/**"
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Add WASM target
+        run: rustup target add wasm32-unknown-unknown
+      - name: Install Trunk
+        run: cargo install trunk --locked
+      - name: Build frontend
+        working-directory: frontend
+        run: trunk build --release
+      - name: Copy dist into Android assets
+        run: |
+          mkdir -p apps/android/assets/web
+          rm -rf apps/android/assets/web/*
+          cp -r dist/* apps/android/assets/web/
+          test -f apps/android/assets/web/index.html
+          test -f apps/android/assets/web/js/mdu-ui.js

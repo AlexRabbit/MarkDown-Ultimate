@@ -651,31 +651,114 @@ window.mduInitPreviewEditor = function () {
 };
 
 window.mduInitUiZoom = function () {
-  var shell = document.getElementById("appShell");
-  if (!shell || shell._mduZoomBound) return;
-  shell._mduZoomBound = true;
+  var target = document.getElementById("mduZoomTarget");
+  if (!target || target._mduZoomBound) return;
+  target._mduZoomBound = true;
   var key = "mdu_ui_zoom";
   var z = 1;
   try {
     var saved = parseFloat(localStorage.getItem(key) || "1");
     if (!isNaN(saved) && saved >= 0.5 && saved <= 2.5) z = saved;
   } catch (e) {}
-  shell.style.zoom = String(z);
+  target.style.zoom = String(z);
+  window.dispatchEvent(new CustomEvent("mdu-ui-zoom", { detail: z }));
   document.addEventListener(
     "wheel",
     function (ev) {
       if (!ev.ctrlKey) return;
-      if (!shell.contains(ev.target)) return;
+      if (!target.contains(ev.target)) return;
       ev.preventDefault();
       z = Math.max(0.5, Math.min(2.5, z + (ev.deltaY < 0 ? 0.06 : -0.06)));
-      shell.style.zoom = String(Math.round(z * 100) / 100);
+      z = Math.round(z * 100) / 100;
+      target.style.zoom = String(z);
       try {
-        localStorage.setItem(key, String(shell.style.zoom));
+        localStorage.setItem(key, String(z));
       } catch (e2) {}
-      window.dispatchEvent(
-        new CustomEvent("mdu-ui-zoom", { detail: parseFloat(shell.style.zoom) })
-      );
+      window.dispatchEvent(new CustomEvent("mdu-ui-zoom", { detail: z }));
     },
     { passive: false }
   );
+};
+
+window.mduResetUiZoom = function () {
+  var target = document.getElementById("mduZoomTarget");
+  if (!target) return;
+  target.style.zoom = "1";
+  try {
+    localStorage.setItem("mdu_ui_zoom", "1");
+  } catch (e) {}
+  window.dispatchEvent(new CustomEvent("mdu-ui-zoom", { detail: 1 }));
+};
+
+window.mduApplyTheme = function (theme) {
+  var t = theme || "light";
+  document.documentElement.setAttribute("data-mdu-theme", t);
+  try {
+    localStorage.setItem("mdu_theme_v1", t);
+  } catch (e) {}
+};
+
+window.mduInitSplitScrollSync = function () {
+  var bind = function () {
+    var surface = document.getElementById("splitEditorSurface");
+    var ta = document.getElementById("mduSourceEditor");
+    var prev = document.getElementById("previewPane");
+    if (!surface || !ta || !prev || ta._mduSplitSyncBound) return;
+    if (!surface.classList.contains("split")) return;
+    ta._mduSplitSyncBound = true;
+    var syncing = false;
+    function sync(from, to) {
+      if (syncing) return;
+      syncing = true;
+      var maxFrom = Math.max(1, from.scrollHeight - from.clientHeight);
+      var ratio = from.scrollTop / maxFrom;
+      var maxTo = Math.max(0, to.scrollHeight - to.clientHeight);
+      to.scrollTop = ratio * maxTo;
+      syncing = false;
+    }
+    ta.addEventListener("scroll", function () {
+      sync(ta, prev);
+    });
+    prev.addEventListener("scroll", function () {
+      sync(prev, ta);
+    });
+  };
+  bind();
+  window.addEventListener("mdu-view-changed", function () {
+    var ta = document.getElementById("mduSourceEditor");
+    if (ta) ta._mduSplitSyncBound = false;
+    bind();
+  });
+  setTimeout(bind, 200);
+};
+
+window.mduInitMobileLayout = function () {
+  if (window._mduMobileInit) return;
+  window._mduMobileInit = true;
+  function applyMobile() {
+    var mobile =
+      window.matchMedia("(max-width: 768px)").matches ||
+      /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent || "");
+    document.body.classList.toggle("mdu-mobile", mobile);
+  }
+  applyMobile();
+  window.addEventListener("resize", applyMobile);
+  window.addEventListener("mdu-view-changed", applyMobile);
+  document.addEventListener("click", function (ev) {
+    var btn = ev.target.closest(".mobile-split-btn");
+    if (!btn) return;
+    var surface = document.getElementById("splitEditorSurface");
+    if (!surface) return;
+    var mode = btn.getAttribute("data-mobile-split");
+    surface.querySelectorAll(".mobile-split-btn").forEach(function (b) {
+      b.classList.toggle("active", b === btn);
+    });
+    surface.classList.remove("show-source", "show-preview");
+    if (mode === "source") surface.classList.add("show-source");
+    else surface.classList.add("show-preview");
+  });
+  try {
+    var theme = localStorage.getItem("mdu_theme_v1") || "light";
+    window.mduApplyTheme(theme);
+  } catch (e) {}
 };

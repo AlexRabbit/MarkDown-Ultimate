@@ -12,6 +12,7 @@ use wasm_bindgen_futures::JsFuture;
 use web_sys::{Blob, BlobPropertyBag, FileReader, RequestMode, Url};
 
 use crate::command_registry::{command_by_id, shortcut_lines, CommandKind, EditorCommand};
+use crate::docs_sidebar::{load_docs_open, save_docs_open, DocsToggle};
 use crate::editor_commands::{copy_text, find_replace, init_editor_shortcuts, jump_to_offset, print_markdown};
 use crate::tools_sidebar::{
     load_tools_open, load_tools_width, run_command_on_editor, ToolsSidebar,
@@ -58,6 +59,10 @@ extern "C" {
     fn mdu_init_outline_resize(handle_id: &str, panel_id: &str, storage_key: &str);
     #[wasm_bindgen(js_namespace = window, js_name = mduPreviewSetFromMarkdown)]
     fn mdu_preview_set_from_markdown(md: &str, html: &str);
+    #[wasm_bindgen(js_namespace = window, js_name = mduApplyTheme)]
+    fn mdu_apply_theme(theme: &str);
+    #[wasm_bindgen(js_namespace = window, js_name = mduResetUiZoom)]
+    fn mdu_reset_ui_zoom();
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -69,6 +74,47 @@ enum ViewMode {
 
 const VIEW_MODE_KEY: &str = "mdu_view_mode_v1";
 const COLLAPSED_FOLDERS_KEY: &str = "mdu_collapsed_folders_v1";
+const THEME_KEY: &str = "mdu_theme_v1";
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum AppTheme {
+    Light,
+    Night,
+    Gold,
+}
+
+fn load_theme() -> AppTheme {
+    match LocalStorage::get::<String>(THEME_KEY) {
+        Ok(ref s) if s == "night" => AppTheme::Night,
+        Ok(ref s) if s == "gold" => AppTheme::Gold,
+        _ => AppTheme::Light,
+    }
+}
+
+fn save_theme(t: AppTheme) {
+    let v = match t {
+        AppTheme::Light => "light",
+        AppTheme::Night => "night",
+        AppTheme::Gold => "gold",
+    };
+    let _ = LocalStorage::set(THEME_KEY, v);
+}
+
+fn theme_label(t: AppTheme) -> &'static str {
+    match t {
+        AppTheme::Light => "Light",
+        AppTheme::Night => "Night",
+        AppTheme::Gold => "Gold",
+    }
+}
+
+fn active_file_name(ws: &Workspace, active_id: &str) -> String {
+    ws.flatten_files_newest_first()
+        .into_iter()
+        .find(|(id, _)| id == active_id)
+        .map(|(_, name)| name)
+        .unwrap_or_else(|| "Untitled".into())
+}
 
 fn load_collapsed_folders() -> HashSet<String> {
     LocalStorage::get::<Vec<String>>(COLLAPSED_FOLDERS_KEY)
@@ -221,7 +267,11 @@ fn editor_body(
             </div>
         }.into_any(),
         ViewMode::Split => view! {
-            <div class="editor-surface split">
+            <div class="editor-surface split" id="splitEditorSurface">
+                <div class="mobile-split-bar" aria-hidden="true">
+                    <button type="button" class="mobile-split-btn active" data-mobile-split="source">"Code"</button>
+                    <button type="button" class="mobile-split-btn" data-mobile-split="preview">"Preview"</button>
+                </div>
                 <textarea id="mduSourceEditor" class="source inline" spellcheck="true"
                     prop:value=move || content.get()
                     on:input=move |ev| {
@@ -285,6 +335,30 @@ pub fn App() -> impl IntoView {
     let (tools_open, set_tools_open) = signal(load_tools_open());
     let (tools_width, set_tools_width) = signal(load_tools_width());
     let (outline_height, set_outline_height) = signal(load_outline_height());
+    let (docs_open, set_docs_open) = signal(load_docs_open());
+    let (app_theme, set_app_theme) = signal(load_theme());
+    let (ui_zoom_pct, set_ui_zoom_pct) = signal(100u32);
+
+    Effect::new(move |_| {
+        let t = match app_theme.get() {
+            AppTheme::Light => "light",
+            AppTheme::Night => "night",
+            AppTheme::Gold => "gold",
+        };
+        mdu_apply_theme(t);
+    });
+
+    Effect::new(move |_| {
+        let window = web_sys::window().unwrap();
+        let set_z = set_ui_zoom_pct;
+        let closure = Closure::wrap(Box::new(move |ev: web_sys::CustomEvent| {
+            if let Some(z) = ev.detail().as_f64() {
+                set_z.set(z.round() as u32);
+            }
+        }) as Box<dyn FnMut(_)>);
+        let _ = window.add_event_listener_with_callback("mdu-ui-zoom", closure.as_ref().unchecked_ref());
+        closure.forget();
+    });
 
     Effect::new(move |_| {
         mdu_init_outline_resize("outlineResizeHandle", "docOutline", OUTLINE_HEIGHT_KEY);
@@ -466,14 +540,36 @@ pub fn App() -> impl IntoView {
                 <div class="actions">
                     <button id="btnOpen" type="button" data-tour-id="btnOpen" on:click=move |_| set_modal.set(ModalKind::Import)>"Open"</button>
                     <button id="btnSave" type="button" data-tour-id="btnSave" on:click=move |_| set_modal.set(ModalKind::Export)>"Save"</button>
-                    <button id="btnDiagnostics" type="button" data-tour-id="btnDiagnostics" on:click=move |_| set_modal.set(ModalKind::Diagnostics)>"Diagnostics"</button>
                 </div>
-                <button id="btnHowTo" data-tour-id="btnHowTo" class=move || if show_pulse.get() { "howto pulse" } else { "howto" }
-                    on:click=start_tour>
-                    "How to Use"
-                </button>
+                <div class="topbar-right">
+                    <span class="doc-title" id="activeDocTitle" data-tour-id="activeDocTitle"
+                        title=move || active_file_name(&workspace.get(), &active_id.get())>
+                        {move || active_file_name(&workspace.get(), &active_id.get())}
+                    </span>
+                    <button id="btnDiagnostics" type="button" class="topbar-secondary" data-tour-id="btnDiagnostics"
+                        on:click=move |_| set_modal.set(ModalKind::Diagnostics)>"Diagnostics"</button>
+                    <button id="btnHowTo" data-tour-id="btnHowTo" class=move || if show_pulse.get() { "howto pulse topbar-secondary" } else { "howto topbar-secondary" }
+                        on:click=start_tour>
+                        "How to Use"
+                    </button>
+                    <button type="button" id="btnTheme" class="topbar-secondary" title="Switch theme"
+                        on:click=move |_| {
+                            set_app_theme.update(|t| {
+                                *t = match *t {
+                                    AppTheme::Light => AppTheme::Night,
+                                    AppTheme::Night => AppTheme::Gold,
+                                    AppTheme::Gold => AppTheme::Light,
+                                };
+                                save_theme(*t);
+                            });
+                        }>
+                        {move || format!("Theme: {}", theme_label(app_theme.get()))}
+                    </button>
+                </div>
             </header>
-            <div class="main">
+            <div class=move || if docs_open.get() { "main" } else { "main main-docs-closed" }>
+                {move || if docs_open.get() {
+                    view! {
                 <aside class="sidebar" id="sidebarTree" data-tour-id="sidebarTree"
                     on:contextmenu=move |ev| {
                         ev.prevent_default();
@@ -482,6 +578,8 @@ pub fn App() -> impl IntoView {
                     <div class="sidebar-head">
                         <span>"Files"</span>
                         <div class="sidebar-toolbar">
+                        <button type="button" class="icon-btn icon-sm sidebar-close" title="Hide files panel" aria-label="Hide files panel"
+                            on:click=move |_| { set_docs_open.set(false); save_docs_open(false); }>"←"</button>
                         <button id="btnCreate" type="button" class="icon-btn icon-sm" title="New file" data-tour-id="btnCreate"
                             on:click=move |_| {
                                 let mut ws = workspace.get_untracked();
@@ -505,7 +603,7 @@ pub fn App() -> impl IntoView {
                                     }
                                     Err(e) => emit(Severity::Warn, "workspace", "folder_create_failed", "frontend", e.to_string(), None, None),
                                 }
-                            }>"+"</button>
+                            }>"📁"</button>
                         </div>
                     </div>
                     <div class="sidebar-tree-scroll">
@@ -527,7 +625,11 @@ pub fn App() -> impl IntoView {
                     </div>
                     <OutlinePanel content=content height_px=outline_height />
                 </aside>
-                <div class="center-column">
+                    }.into_any()
+                } else {
+                    view! { <span class="hidden" aria-hidden="true"></span> }.into_any()
+                }}
+                <div class="center-column mdu-zoom-target" id="mduZoomTarget">
                 <section class="editor-pane">
                     <div class="view-pill" role="tablist" aria-label="Editor view mode">
                         <button type="button" id="modeMarkdown" data-tour-id="modeSource"
@@ -541,6 +643,7 @@ pub fn App() -> impl IntoView {
                             on:click=move |_| set_view(ViewMode::Preview)>"Preview"</button>
                     </div>
                     <div class="editor-row">
+                    <DocsToggle open=docs_open set_open=set_docs_open />
                     <div class=move || format!("editor view-{}", view_class(view_mode.get())) id="editorArea" data-tour-id="editorArea">
                         {move || editor_body(view_mode.get(), content, set_content, save_content)}
                     </div>
@@ -549,8 +652,14 @@ pub fn App() -> impl IntoView {
                     <div class="status-bar" id="docStatusBar" data-tour-id="docStatusBar">
                         {move || {
                             let (words, chars) = doc_stats(&content.get());
-                            format!("{words} words · {chars} characters · Ctrl+scroll zoom · Ctrl+F find · Ctrl+/ shortcuts")
+                            format!(
+                                "{words} words · {chars} characters · Zoom {z}% · Ctrl+scroll · ",
+                                z = ui_zoom_pct.get()
+                            )
                         }}
+                        <button type="button" class="status-link" id="btnResetZoom"
+                            on:click=move |_| mdu_reset_ui_zoom()>"Reset zoom"</button>
+                        {move || format!(" · Ctrl+F find · Ctrl+/ shortcuts")}
                     </div>
                 </section>
                 </div>
@@ -709,7 +818,7 @@ fn SidebarNodeView(
                         ev.stop_propagation();
                         set_menu.set((MenuTarget::SidebarNode(id_ctx_menu.clone()), ev.client_x(), ev.client_y()));
                     }>"⋮"</button>
-                <span class="file-name">{name}</span>
+                <span class="file-name" title=name.clone()>{name.clone()}</span>
             </li>
         }.into_any(),
         Node::Folder { name, id: fid, .. } => {
@@ -761,7 +870,7 @@ fn SidebarNodeView(
                                 ev.stop_propagation();
                                 set_menu.set((MenuTarget::SidebarNode(folder_id_menu.clone()), ev.client_x(), ev.client_y()));
                             }>"⋮"</button>
-                        <span class="folder-name">"📁 " {name.clone()}</span>
+                        <span class="folder-name" title=name.clone()>"📁 " {name.clone()}</span>
                     </div>
                     <div class=move || {
                         if collapsed_folders.get().contains(&folder_id_collapsed_check) {

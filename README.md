@@ -12,11 +12,28 @@
 ---
 ![Preview](https://raw.githubusercontent.com/AlexRabbit/MarkDown-Ultimate/refs/heads/main/PREVIEW.png)
 ---
-## What it is
+
+## Quick start (Windows) — double-click launcher
+
+1. Open this project folder in File Explorer.
+2. **Double-click `Launch-MarkDownUltimate.bat`** (in the project root).
+3. Wait a few seconds. Your browser should open to **`http://127.0.0.1:8765/MarkDown-Ultimate/`** with the editor ready.
+4. **Leave the black command window open** while you write — it runs the tiny local server.
+
+| If this happens | What to do |
+| --- | --- |
+| Browser says “can’t connect” | Wait 5 seconds and refresh; check that the command window is still open. |
+| “Python is required” | Install [Python 3](https://www.python.org/downloads/) (check “Add to PATH”), then run the `.bat` again. |
+| “Trunk build failed” | Install [Rust](https://rustup.rs/) and run `cargo install trunk`, then double-click the `.bat` again. |
+| You want a desktop window instead of a browser tab | Build once with `tools\portable-bundle.ps1`, then double-click **`Run-Portable-MarkDownUltimate.bat`**. |
+
+**Success looks like:** files on the left, editor in the center, optional **Tools** tab on the right, and your note text in the middle pane.
+
+---
 
 **MarkDown Ultimate** is a writing app for Markdown: the plain, readable format used for notes, docs, and README files. You work in your browser or in a small desktop window — no account required for the online version.
 
----
+## What it is
 
 ## What it does
 
@@ -30,12 +47,11 @@ Everything feels like one desk: files on the left, writing in the middle, option
 
 | Area | What you get |
 | --- | --- |
-| **Left — Files** | Folder tree, scroll when you have lots of notes. **📄** creates a new note; **+** creates a new folder. Use **⋮** on a file or folder to rename or remove. Drag items to reorder or nest. |
-| **Center — Editor** | Write Markdown with a **Markdown / Both / Preview** switch at the top. Preview shows headings, lists, tables, math, and more. |
-| **Right — Tools** (optional) | Open **⟨ Tools** for formatting shortcuts, find/replace, and a shortcut cheat sheet. |
-| **Below the tree — Outline** | Click a heading to jump in the long notes. |
-| **Top bar** | **Open** and **Save** for files and full-workspace backups; **How to Use** starts a guided tour when *you* choose. |
-| **Bottom** | Word and character counts. |
+| **Left — Files** | Folder tree + outline. **←** hides the panel; **Docs ⟩** opens it again. Hover a name to see the full title. **📄** new note; **📁** new folder. **⋮** menu to rename or remove. |
+| **Top bar** | **Open** / **Save**, current file name (hover for full name), **Diagnostics**, **How to Use**, **Theme** (Light / Night / Gold). |
+| **Center — Editor** | **Markdown / Both / Preview**. **Both** keeps source and preview scrolled together. **Ctrl+scroll** zooms the editor area; status bar shows **Zoom %** and **Reset zoom**. |
+| **Right — Tools** | **⟨ Tools** tab (same idea as **Docs ⟩** on the left). Formatting, images, find/replace. |
+| **Phone / APK** | Side panels become overlays; **Both** switches between **Code** and **Preview** tabs (desktop layout unchanged). |
 
 **Helpful extras:** PDF via your browser’s print dialog, diagnostics copy for support, and a guided tour that never pops up on its own.
 
@@ -92,7 +108,17 @@ An older setup copied a second folder with a similar name (`MarkDown-Ultimate` n
 
 ---
 
-## Publish your own copy online (light overview)
+## Manual GitHub upload folder
+
+For a clean copy without build caches, run:
+
+```powershell
+.\QTestings\prepare-github-public.ps1
+```
+
+Output: **`release\github-public\`** — review, then upload manually. A second secret scan runs on that folder.
+
+---
 
 If you fork this project on GitHub:
 

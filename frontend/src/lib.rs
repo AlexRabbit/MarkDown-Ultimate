@@ -1,6 +1,7 @@
 mod app;
 mod command_registry;
 mod editor_commands;
+mod docs_sidebar;
 mod tools_sidebar;
 
 use app::App;

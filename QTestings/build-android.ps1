@@ -42,6 +42,12 @@ rustup target add aarch64-linux-android 2>&1 | Out-Null
 
 Push-Location (Join-Path $root "apps")
 try {
+    $sync = Join-Path $root "QTestings\sync-android-web-assets.ps1"
+    if (Test-Path $sync) {
+        Write-Log "Syncing latest web dist into Android assets..."
+        & $sync 2>&1 | ForEach-Object { Write-Log $_ }
+    }
+
     cargo fetch --locked 2>&1 | Out-Null
 
     Write-Log "Building APK (must use --target aarch64-linux-android, not PC x86_64)..."
