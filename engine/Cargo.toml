@@ -14,7 +14,7 @@ tower-http = { version = "0.6", features = ["fs"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net"] }
-async-nats = "0.51"
+async-nats = "0.52"
 mu_config = { path = "../code/config" }
 mu_diagnostics = { path = "../code/diagnostics" }
 mu_workspace = { path = "../modules/workspace" }
